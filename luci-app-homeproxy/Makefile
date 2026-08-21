@@ -1,29 +1,34 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (C) 2022-2023 ImmortalWrt.org
 
 include $(TOPDIR)/rules.mk
 
-LUCI_TITLE:=The modern ImmortalWrt proxy platform for ARM64/AMD64
+LUCI_TITLE:=The modern ImmortalWrt proxy platform for ARM64/AMD64 — AI Edition
 LUCI_PKGARCH:=all
 LUCI_DEPENDS:= \
+	+luci-base \
 	+sing-box \
 	+firewall4 \
+	+ip-full \
+	+kmod-tun \
 	+kmod-nft-tproxy \
-	+ucode-mod-digest \
-	+ucode-mod-math \
-	+wget-ssl \
 	+curl \
-	+unzip
-
-
+	+flock \
+	+unzip \
+	+ucode-mod-digest \
+	+ucode-mod-math
 LUCI_EXTRA_DEPENDS:=sing-box (>=1.14.0_alpha1)
+
 PKG_NAME:=luci-app-homeproxy
-PKG_VERSION:=1.0.0
+PKG_VERSION:=20260818
 PKG_RELEASE:=1
 PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
 
 define Package/luci-app-homeproxy/conffiles
 /etc/config/homeproxy
-/etc/homeproxy/certs/
 /etc/homeproxy/cache/
+/etc/homeproxy/certs/
 /etc/homeproxy/custom/
 /etc/homeproxy/ruleset/
 /etc/homeproxy/resources/direct_list.txt
@@ -32,3 +37,4 @@ endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
+# call BuildPackage - OpenWrt buildroot signature
