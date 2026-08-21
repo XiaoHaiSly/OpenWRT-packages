@@ -14,6 +14,7 @@ LUCI_DEPENDS:= \
 	+kmod-tun \
 	+kmod-nft-tproxy \
 	+curl \
+    +wget-ssl \
 	+flock \
 	+unzip \
 	+ucode-mod-digest \
