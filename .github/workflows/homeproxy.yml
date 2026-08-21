@@ -15,7 +15,7 @@ jobs:
       matrix:
         sdk:
           - 24.10.6
-          - 25.12.0
+          - 25.12.5
         arch:
           - aarch64_cortex-a53
           - x86_64
