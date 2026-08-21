@@ -27,15 +27,22 @@ jobs:
       - name: Prepare feeds and Custom package
         working-directory: sdk
         run: |
-          # 1. 必须拉取官方 feeds，否则会缺少 luci.mk 导致你的 Makefile 报错
+          # 1. 拉取并安装所有官方 feeds
           ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          ./scripts/feeds install -a || true # 允许坏包安装报错，不中断流程
 
-          # 2. 暴力删除官方同名包，解决你之前被“官方包顶替”的问题
+          # 2. 强杀官方 snapshot 中的循环依赖坏包（避免卡死 defconfig）
+          echo "=== 正在清理官方损坏包 ==="
+          find feeds -path "*/gnunet*" -type d -prune -exec rm -rf {} +
+          find feeds -path "*/prometheus-node-exporter*" -type d -prune -exec rm -rf {} +
+
+          # 3. 解决官方 homeproxy 的同名包冲突
+          echo "=== 正在移除官方同名包 ==="
           rm -rf feeds/luci/applications/luci-app-homeproxy
           rm -rf package/feeds/luci/luci-app-homeproxy
 
-          # 3. 把你仓库里的源码放进 package 目录
+          # 4. 把你仓库里的源码放进 package 目录
+          echo "=== 正在载入自定义源码 ==="
           mkdir -p package/luci-app-homeproxy
           cp -r ../luci-app-homeproxy/* package/luci-app-homeproxy/
 
@@ -43,12 +50,13 @@ jobs:
         working-directory: sdk
         run: |
           echo "CONFIG_PACKAGE_luci-app-homeproxy=y" > .config
+          # 生成索引。此时没有坏包阻碍，应该能正常扫描到你的 homeproxy
           make defconfig
+          # 开始编译
           make package/luci-app-homeproxy/compile V=s -j$(nproc)
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: luci-app-homeproxy
-          # 模糊匹配 bin 目录下生成的所有相关包 (自动兼容 apk/ipk)
           path: sdk/bin/**/luci-app-homeproxy*
