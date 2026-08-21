@@ -1,8 +1,3 @@
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- *
- * Copyright (C) 2022-2025 ImmortalWrt.org
- */
 
 'use strict';
 'require form';
@@ -25,7 +20,7 @@ const callServiceList = rpc.declare({
 const CBIGenValue = form.Value.extend({
 	__name__: 'CBI.GenValue',
 
-	renderWidget(/* ... */) {
+	renderWidget() {
 		let node = form.Value.prototype.renderWidget.apply(this, arguments);
 
 		if (!this.password)
@@ -104,7 +99,6 @@ function handleGenKey(option) {
 				password = hp.generateRand('hex', 16);
 				break;
 		}
-		/* AEAD */
 		((length) => {
 			if (length && length > 0)
 				password = hp.generateRand('base64', length);
@@ -240,19 +234,13 @@ return view.extend({
 		}
 		o.modalonly = true;
 
-		/* AnyTLS config */
 		o = s.option(form.DynamicList, 'anytls_padding_scheme', _('Padding scheme'),
 			_('AnyTLS padding scheme in array.'));
 		o.depends('type', 'anytls');
 		o.modalonly = true;
 
-		/* Hysteria (2) config start */
 		o = s.option(form.ListValue, 'hysteria_protocol', _('Protocol'));
 		o.value('udp');
-		/* WeChat-Video / FakeTCP are unsupported by sing-box currently
-		   o.value('wechat-video');
-		   o.value('faketcp');
-		*/
 		o.default = 'udp';
 		o.depends('type', 'hysteria');
 		o.rmempty = false;
@@ -332,9 +320,7 @@ return view.extend({
 			_('HTTP3 server behavior when authentication fails.<br/>A 404 page will be returned if empty.'));
 		o.depends('type', 'hysteria2');
 		o.modalonly = true;
-		/* Hysteria (2) config end */
 
-		/* Shadowsocks config */
 		o = s.option(form.ListValue, 'shadowsocks_encrypt_method', _('Encrypt method'));
 		for (let i of hp.shadowsocks_encrypt_methods)
 			o.value(i);
@@ -342,7 +328,6 @@ return view.extend({
 		o.depends('type', 'shadowsocks');
 		o.modalonly = true;
 
-		/* Tuic config start */
 		o = s.option(CBIGenValue, 'uuid', _('UUID'));
 		o.password = true;
 		o.depends('type', 'tuic');
@@ -379,9 +364,7 @@ return view.extend({
 		o.default = '10';
 		o.depends('type', 'tuic');
 		o.modalonly = true;
-		/* Tuic config end */
 
-		/* VLESS / VMess config start */
 		o = s.option(form.ListValue, 'vless_flow', _('Flow'));
 		o.value('', _('None'));
 		o.value('xtls-rprx-vision');
@@ -393,9 +376,7 @@ return view.extend({
 		o.datatype = 'uinteger';
 		o.depends('type', 'vmess');
 		o.modalonly = true;
-		/* VMess config end */
 
-		/* Transport config start */
 		o = s.option(form.ListValue, 'transport', _('Transport'),
 			_('No TCP transport, plain HTTP is merged into the HTTP transport.'));
 		o.value('', _('None'));
@@ -426,14 +407,11 @@ return view.extend({
 		}
 		o.modalonly = true;
 
-		/* gRPC config start */
 		o = s.option(form.Value, 'grpc_servicename', _('gRPC service name'));
 		o.depends('transport', 'grpc');
 		o.modalonly = true;
 
-		/* gRPC config end */
 
-		/* HTTP(Upgrade) config start */
 		o = s.option(form.DynamicList, 'http_host', _('Host'));
 		o.datatype = 'hostname';
 		o.depends('transport', 'http');
@@ -467,9 +445,7 @@ return view.extend({
 			o.depends('transport', 'grpc');
 			o.modalonly = true;
 		}
-		/* HTTP config end */
 
-		/* WebSocket config start */
 		o = s.option(form.Value, 'ws_host', _('Host'));
 		o.depends('transport', 'ws');
 		o.modalonly = true;
@@ -492,11 +468,8 @@ return view.extend({
 		o.value('Sec-WebSocket-Protocol');
 		o.depends('transport', 'ws');
 		o.modalonly = true;
-		/* WebSocket config end */
 
-		/* Transport config end */
 
-		/* Mux config start */
 		o = s.option(form.Flag, 'multiplex', _('Multiplex'));
 		o.depends('type', 'shadowsocks');
 		o.depends('type', 'trojan');
@@ -526,9 +499,7 @@ return view.extend({
 			o.depends('multiplex_brutal', '1');
 			o.modalonly = true;
 		}
-		/* Mux config end */
 
-		/* TLS config start */
 		o = s.option(form.Flag, 'tls', _('TLS'));
 		o.depends('type', 'anytls');
 		o.depends('type', 'http');
@@ -839,9 +810,7 @@ return view.extend({
 		o.rows = 3;
 		o.depends('tls', '1');
 		o.modalonly = true;
-		/* TLS config end */
 
-		/* Extra settings start */
 		o = s.option(form.Flag, 'tcp_fast_open', _('TCP fast open'),
 			_('Enable tcp fast open for listener.'));
 		o.depends({'network': 'udp', '!reverse': true});
@@ -880,7 +849,6 @@ return view.extend({
 		o = s.option(form.Flag, 'reuse_addr', _('Reuse address'),
 			_('Reuse listener address.'));
 		o.modalonly = true;
-		/* Extra settings end */
 
 		return m.render();
 	}

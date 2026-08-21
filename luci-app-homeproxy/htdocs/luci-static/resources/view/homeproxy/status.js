@@ -1,8 +1,3 @@
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- *
- * Copyright (C) 2022-2025 ImmortalWrt.org
- */
 
 'use strict';
 'require dom';
@@ -14,7 +9,6 @@
 'require ui';
 'require view';
 
-/* Thanks to luci-app-aria2 */
 const css = '				\
 #log_textarea {				\
 	padding: 10px;			\
@@ -76,41 +70,223 @@ function getResVersion(o, type) {
 	});
 
 	return L.resolveDefault(callResVersion(type), {}).then((res) => {
+		const versionEl = E('strong', { 'style': (res.error ? 'color:red' : 'color:green') },
+			[ res.error ? 'not found' : res.version ]
+		);
+		const msgEl = E('span', { 'style': 'margin-left:8px; font-size:0.9em; color:gray' }, '');
+
 		let spanTemp = E('div', { 'style': 'cbi-value-field' }, [
 			E('button', {
 				'class': 'btn cbi-button cbi-button-action',
 				'click': ui.createHandlerFn(this, () => {
-					return L.resolveDefault(callResUpdate(type), {}).then((res) => {
-						switch (res.status) {
+					return L.resolveDefault(callResUpdate(type), {}).then((updRes) => {
+						let msg, color;
+						switch (updRes.status) {
 						case 0:
-							o.description = _('Successfully updated.');
+							msg = _('Successfully updated.'); color = 'green';
 							break;
 						case 1:
-							o.description = _('Update failed.');
+							msg = _('Update failed.'); color = 'red';
 							break;
 						case 2:
-							o.description = _('Already in updating.');
+							msg = _('Already in updating.'); color = 'darkorange';
 							break;
 						case 3:
-							o.description = _('Already at the latest version.');
+							msg = _('Already at the latest version.'); color = 'gray';
 							break;
 						default:
-							o.description = _('Unknown error.');
+							msg = _('Unknown error.'); color = 'red';
 							break;
 						}
+						msgEl.textContent = msg;
+						msgEl.style.color = color;
 
-						return o.map.reset();
+						return L.resolveDefault(callResVersion(type), {}).then((verRes) => {
+							versionEl.textContent = verRes.error ? 'not found' : verRes.version;
+							versionEl.style.color = verRes.error ? 'red' : 'green';
+						});
 					});
 				})
 			}, [ _('Check update') ]),
 			' ',
-			E('strong', { 'style': (res.error ? 'color:red' : 'color:green') },
-				[ res.error ? 'not found' : res.version ]
-			),
+			versionEl,
+			msgEl
 		]);
 
 		o.default = spanTemp;
 	});
+}
+
+function callCoreInfo() {
+	return rpc.declare({ object: 'luci.homeproxy', method: 'core_info', expect: { '': {} } })();
+}
+function callCoreCheckRemote(core, channel) {
+	return rpc.declare({ object: 'luci.homeproxy', method: 'core_check_remote', params: ['core', 'channel'], expect: { '': {} } })(core, channel);
+}
+function callCorePrepare(core, channel) {
+	return rpc.declare({ object: 'luci.homeproxy', method: 'core_prepare_install', params: ['core', 'channel'], expect: { '': {} } })(core, channel);
+}
+function callCoreDownload(url, tmp_path) {
+	return rpc.declare({ object: 'luci.homeproxy', method: 'core_download', params: ['url', 'tmp_path'], expect: { '': {} } })(url, tmp_path);
+}
+function callCoreInstall(core, tmp_path) {
+	return rpc.declare({ object: 'luci.homeproxy', method: 'core_install', params: ['core', 'tmp_path'], expect: { '': {} } })(core, tmp_path);
+}
+function callCoreRestore() {
+	return rpc.declare({ object: 'luci.homeproxy', method: 'core_restore', expect: { '': {} } })();
+}
+
+function buildCoreContext() {
+	const vendorEl = E('strong', { 'style': 'color:gray' }, _('Loading...'));
+	const versionEl = E('strong', { 'style': 'color:gray' }, '');
+	const restoreMsgEl = E('span', { 'style': 'margin-left:8px; font-size:0.9em' }, '');
+	const setRestoreMsg = (txt, color) => { restoreMsgEl.textContent = txt; restoreMsgEl.style.color = color || 'gray'; };
+
+	let restoreBtn;
+
+	let busy = false;
+	const lockables = [];
+	function registerLockable(el) { lockables.push(el); return el; }
+	function setBusy(state) {
+		busy = state;
+		for (let el of lockables) el.disabled = state || (el === restoreBtn && !restoreBtn.__hasBackup);
+	}
+
+	const savedChannel = uci.get('homeproxy', 'config', 'core_channel');
+	const channelSelect = registerLockable(E('select', {
+		'class': 'cbi-input-select',
+		'change': ui.createHandlerFn(this, (ev) => {
+			const newChannel = ev.target.value;
+			uci.set('homeproxy', 'config', 'core_channel', newChannel);
+			return uci.save().then(() => {
+				return ui.changes.apply(true);
+			}).catch((err) => {
+				ui.addNotification(null, E('p', _('Failed to save channel: %s').format(err || '')), 'error');
+			});
+		})
+	}, [
+		E('option', { 'value': 'latest', 'selected': (savedChannel !== 'stable') ? '' : null }, [ 'Latest' ]),
+		E('option', { 'value': 'stable', 'selected': (savedChannel === 'stable') ? '' : null }, [ 'Stable' ])
+	]));
+	const getChannel = () => channelSelect.value;
+
+	function refreshStatus() {
+		return L.resolveDefault(callCoreInfo(), {}).then((info) => {
+			if (info.installed) {
+				const vendorLabel = info.vendor === 'ref1nd' ? 'reF1nd' : 'Official';
+				vendorEl.textContent = vendorLabel;
+				vendorEl.style.color = 'green';
+				versionEl.textContent = 'v' + info.version;
+				versionEl.style.color = 'green';
+			} else {
+				vendorEl.textContent = _('Not detected');
+				vendorEl.style.color = 'red';
+				versionEl.textContent = '';
+			}
+			if (restoreBtn) {
+				restoreBtn.__hasBackup = !!info.has_backup;
+				restoreBtn.disabled = busy || !info.has_backup;
+			}
+			return info;
+		});
+	}
+
+	function buildRow(core, label) {
+		const remoteEl = E('strong', { 'style': 'color:gray; margin-left:8px; font-weight:normal; font-size:0.9em' }, '');
+
+		const updateBtn = registerLockable(E('button', {
+			'class': 'btn cbi-button cbi-button-action',
+			'click': async function() {
+				if (busy) return;
+				setBusy(true);
+				remoteEl.textContent = _('Checking requirements...');
+				remoteEl.style.color = 'gray';
+
+				const prep = await L.resolveDefault(callCorePrepare(core, getChannel()), {});
+				if (prep.error) {
+					remoteEl.textContent = prep.error;
+					remoteEl.style.color = 'red';
+					setBusy(false);
+					return;
+				}
+
+				remoteEl.textContent = _('Downloading') + ' v' + prep.version + '...';
+				const dl = await L.resolveDefault(callCoreDownload(prep.dl_url, prep.tmp_path), {});
+				if (!dl.result) {
+					remoteEl.textContent = dl.error || _('Download failed');
+					remoteEl.style.color = 'red';
+					setBusy(false);
+					return;
+				}
+
+				remoteEl.textContent = _('Installing (service will restart)...');
+				const inst = await L.resolveDefault(callCoreInstall(core, prep.tmp_path), {});
+				if (!inst.result) {
+					remoteEl.textContent = inst.error || _('Installation failed');
+					remoteEl.style.color = 'red';
+					setBusy(false);
+					return;
+				}
+
+				remoteEl.textContent = _('Updated successfully');
+				remoteEl.style.color = 'green';
+				await refreshStatus();
+				setBusy(false);
+			}
+		}, [ label ]));
+
+		const checkBtn = registerLockable(E('button', {
+			'class': 'btn cbi-button',
+			'style': 'margin-left:4px',
+			'click': async function() {
+				if (busy) return;
+				setBusy(true);
+				remoteEl.textContent = _('Checking...');
+				remoteEl.style.color = 'gray';
+				const ret = await L.resolveDefault(callCoreCheckRemote(core, getChannel()), {});
+				setBusy(false);
+				if (ret.error) {
+					remoteEl.textContent = ret.error;
+					remoteEl.style.color = 'red';
+				} else {
+					remoteEl.textContent = _('Latest') + ': v' + ret.version + (ret.prerelease ? ' (pre-release)' : '');
+					remoteEl.style.color = 'darkorange';
+				}
+			}
+		}, [ _('Check update') ]));
+
+		return E('div', { 'style': 'cbi-value-field' }, [ updateBtn, checkBtn, remoteEl ]);
+	}
+
+	restoreBtn = registerLockable(E('button', {
+		'class': 'btn cbi-button cbi-button-negative',
+		'style': 'margin-left:8px',
+		'disabled': true,
+		'click': async function() {
+			if (busy) return;
+			setBusy(true);
+			setRestoreMsg(_('Restoring firmware-shipped version...'), 'gray');
+			const ret = await L.resolveDefault(callCoreRestore(), {});
+			if (ret.result) {
+				setRestoreMsg(_('Restored successfully'), 'green');
+				await refreshStatus();
+			} else {
+				setRestoreMsg(ret.error || _('Restore failed'), 'red');
+			}
+			setBusy(false);
+		}
+	}, [ _('Restore firmware version') ]));
+
+	refreshStatus();
+
+	return {
+		vendorRow: E('div', { 'style': 'cbi-value-field' }, [ vendorEl ]),
+		versionRow: E('div', { 'style': 'cbi-value-field' }, [ versionEl ]),
+		channelRow: E('div', { 'style': 'cbi-value-field' }, [ channelSelect ]),
+		officialRow: buildRow('official', _('Update to latest')),
+		ref1ndRow: buildRow('ref1nd', _('Update to latest')),
+		restoreRow: E('div', { 'style': 'cbi-value-field' }, [ restoreBtn, restoreMsgEl ])
+	};
 }
 
 function getRuntimeLog(o, name, _option_index, section_id, _in_table) {
@@ -256,6 +432,42 @@ return view.extend({
 		o = s.option(form.DummyValue, '_gfw_list_version', _('GFW list version'));
 		o.cfgvalue = L.bind(getResVersion, this, o, 'gfw_list');
 		o.rawhtml = true;
+
+		o = s.option(form.DummyValue, '_dashboard_version', _('Dashboard version'));
+		o.cfgvalue = L.bind(getResVersion, this, o, 'dashboard');
+		o.rawhtml = true;
+
+		s = m.section(form.NamedSection, 'config', 'homeproxy', _('Core management'));
+		s.anonymous = true;
+
+		let coreCtx = null;
+		const ensureCoreCtx = () => {
+			if (!coreCtx)
+				coreCtx = buildCoreContext.call(this);
+			return coreCtx;
+		};
+		function bindCoreRow(opt, key) {
+			opt.cfgvalue = () => { opt.default = ensureCoreCtx()[key]; };
+			opt.rawhtml = true;
+		}
+
+		o = s.option(form.DummyValue, '_core_vendor', _('Active core'));
+		bindCoreRow(o, 'vendorRow');
+
+		o = s.option(form.DummyValue, '_core_version', _('Version'));
+		bindCoreRow(o, 'versionRow');
+
+		o = s.option(form.DummyValue, '_core_channel', _('Update channel'));
+		bindCoreRow(o, 'channelRow');
+
+		o = s.option(form.DummyValue, '_core_official', _('Official'));
+		bindCoreRow(o, 'officialRow');
+
+		o = s.option(form.DummyValue, '_core_ref1nd', _('reF1nd'));
+		bindCoreRow(o, 'ref1ndRow');
+
+		o = s.option(form.DummyValue, '_core_restore', _('Restore'));
+		bindCoreRow(o, 'restoreRow');
 
 		o = s.option(form.Value, 'github_token', _('GitHub token'));
 		o.password = true;

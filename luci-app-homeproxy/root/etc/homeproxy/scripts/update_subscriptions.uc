@@ -1,9 +1,4 @@
-#!/usr/bin/ucode
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- *
- * Copyright (C) 2023 ImmortalWrt.org
- */
+#!/usr/bin/ucode -S
 
 'use strict';
 
@@ -13,14 +8,12 @@ import { connect } from 'ubus';
 import { cursor } from 'uci';
 
 import { urldecode, urlencode } from 'luci.http';
-import { init_action } from 'luci.sys';
 
 import {
 	wGET, decodeBase64Str, getTime, isEmpty, parseURL,
 	validation, HP_DIR, RUN_DIR
 } from 'homeproxy';
 
-/* UCI config start */
 const uci = cursor();
 
 const uciconfig = 'homeproxy';
@@ -38,15 +31,10 @@ const allow_insecure = uci.get(uciconfig, ucisubscription, 'allow_insecure') || 
       user_agent = uci.get(uciconfig, ucisubscription, 'user_agent'),
       via_proxy = uci.get(uciconfig, ucisubscription, 'update_via_proxy') || '0';
 
-const routing_mode = uci.get(uciconfig, ucimain, 'routing_mode') || 'bypass_mainalnd_china';
-let main_node, main_udp_node;
-if (routing_mode !== 'custom') {
-	main_node = uci.get(uciconfig, ucimain, 'main_node') || 'nil';
-	main_udp_node = uci.get(uciconfig, ucimain, 'main_udp_node') || 'nil';
-}
-/* UCI config end */
+const main_node_setting = uci.get(uciconfig, ucimain, 'main_node') || 'nil';
+const main_node = main_node_setting,
+      main_udp_node = uci.get(uciconfig, ucimain, 'main_udp_node') || 'nil';
 
-/* String helper start */
 function filter_check(name) {
 	if (isEmpty(name) || filter_mode === 'disabled' || isEmpty(filter_keywords))
 		return false;
@@ -62,17 +50,17 @@ function filter_check(name) {
 
 	return ret;
 }
-/* String helper end */
 
-/* Common var start */
+function init_action(service, action) {
+	return system(`/etc/init.d/${service} ${action} >/dev/null 2>&1`);
+}
+
 const node_cache = {},
       node_result = [];
 
 const ubus = connect();
 const sing_features = ubus.call('luci.homeproxy', 'singbox_get_features', {}) || {};
-/* Common var end */
 
-/* Log */
 system(`mkdir -p ${RUN_DIR}`);
 function log(...args) {
 	const logfile = open(`${RUN_DIR}/homeproxy.log`, 'a');
@@ -80,12 +68,585 @@ function log(...args) {
 	logfile.close();
 }
 
+function has_value(value) {
+	return value !== null && value !== '' && value !== 'nil';
+}
+
+function to_string(value) {
+	return has_value(value) ? sprintf('%s', value) : null;
+}
+
+function bool_to_uci(value) {
+	if (value === true)
+		return '1';
+	if (value === false)
+		return '0';
+	return null;
+}
+
+function normalize_list(value) {
+	if (!has_value(value))
+		return null;
+	if (type(value) === 'array')
+		return value;
+	return [to_string(value)];
+}
+
+function normalize_alpn(value) {
+	if (!has_value(value))
+		return null;
+	if (type(value) === 'array')
+		return value;
+	if (type(value) === 'string') {
+		let items = map(split(value, ','), (v) => trim(v));
+		items = filter(items, (v) => length(v));
+		return length(items) ? items : null;
+	}
+	return [to_string(value)];
+}
+
+function normalize_host_list(value) {
+	if (!has_value(value))
+		return null;
+	if (type(value) === 'array')
+		return value;
+	return split(to_string(value), ',');
+}
+
+function normalize_first(value) {
+	if (!has_value(value))
+		return null;
+	if (type(value) === 'array')
+		return length(value) ? value[0] : null;
+	return to_string(value);
+}
+
+function normalize_hysteria_hopping_port(mport) {
+	if (!has_value(mport))
+		return null;
+
+	let ports = [];
+	for (let p in split(to_string(mport), ',')) {
+		p = trim(p);
+		if (!p)
+			continue;
+		if (match(p, /^\d+$/))
+			p = p + ':' + p;
+		else
+			p = replace(p, '-', ':');
+		push(ports, p);
+	}
+
+	return length(ports) ? ports : null;
+}
+
+function normalize_mihomo_ports(ports) {
+	if (!has_value(ports))
+		return null;
+
+	if (type(ports) === 'array')
+		return map(ports, (p) => {
+			const v = to_string(p);
+			if (match(v, /^\d+$/))
+				return v + ':' + v;
+			return replace(v, '-', ':');
+		});
+
+	return normalize_hysteria_hopping_port(to_string(ports));
+}
+
+function parse_mihomo_speed(value) {
+	if (!has_value(value))
+		return null;
+
+	const str = to_string(value);
+	const match_val = match(str, /[0-9]+(\.[0-9]+)?/);
+	if (!match_val)
+		return null;
+
+	const num_str = type(match_val) === 'array' ? match_val[0] : match_val;
+	if (!num_str)
+		return null;
+
+	const num = int(num_str);
+	if (num === null || num != num)
+		return null;
+
+	return to_string(num);
+}
+
+function get_header_host(headers) {
+	if (type(headers) !== 'object')
+		return null;
+
+	return headers.Host || headers.host || headers['HOST'];
+}
+
+function apply_transport_opts(config, proxy) {
+	const network = proxy.network;
+	if (!has_value(network) || network === 'tcp')
+		return;
+
+	let ws_opts = proxy['ws-opts'] || {};
+	let grpc_opts = proxy['grpc-opts'] || {};
+	let http_opts = proxy['http-opts'] || proxy['h2-opts'] || {};
+	let httpupgrade_opts = proxy['http-upgrade-opts'] || {};
+
+	switch (network) {
+	case 'ws':
+		config.transport = 'ws';
+		config.ws_path = ws_opts.path ? to_string(ws_opts.path) : null;
+		config.ws_host = get_header_host(ws_opts.headers);
+		config.websocket_early_data = ws_opts['early-data'] ? to_string(ws_opts['early-data']) : null;
+		config.websocket_early_data_header = ws_opts['early-data-header-name'] ?
+			to_string(ws_opts['early-data-header-name']) : null;
+		break;
+	case 'grpc':
+		config.transport = 'grpc';
+		config.grpc_servicename = to_string(grpc_opts['grpc-service-name'] || grpc_opts['service-name']);
+		break;
+	case 'http':
+	case 'h2':
+		config.transport = 'http';
+		config.http_path = normalize_first(http_opts.path);
+		config.http_host = normalize_host_list(get_header_host(http_opts.headers) || http_opts.host);
+		break;
+	case 'httpupgrade':
+		config.transport = 'httpupgrade';
+		config.httpupgrade_host = get_header_host(httpupgrade_opts.headers) || httpupgrade_opts.host;
+		config.http_path = normalize_first(httpupgrade_opts.path);
+		break;
+	}
+}
+function parse_mihomo_proxy(proxy) {
+	if (type(proxy) !== 'object')
+		return null;
+
+	let config;
+	const tls_sni = proxy.servername || proxy.sni;
+	const tls_fingerprint = proxy['client-fingerprint'] || proxy.fingerprint;
+	const tls_insecure = (proxy['skip-cert-verify'] === true || proxy.insecure === '1' || proxy.allowInsecure === true || proxy.allowInsecure === '1') ? '1'
+		: (proxy['skip-cert-verify'] === false || proxy.insecure === '0' || proxy.allowInsecure === false || proxy.allowInsecure === '0') ? '0'
+		: null;
+
+	switch (proxy.type) {
+	case 'anytls': {
+		let anytls_fp = (proxy['client-fingerprint'] !== null && proxy['client-fingerprint'] !== undefined) ?
+			proxy['client-fingerprint'] : proxy.fingerprint;
+		anytls_fp = to_string(anytls_fp);
+		if (anytls_fp === 'none' || anytls_fp === 'disable' || anytls_fp === 'disabled')
+			anytls_fp = null;
+		else if (!has_value(anytls_fp))
+			anytls_fp = 'chrome';
+		config = {
+			label: proxy.name,
+			type: 'anytls',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			password: proxy.password,
+			tls: '1',
+			tls_sni: tls_sni || proxy.peer,
+			tls_alpn: normalize_alpn(proxy.alpn),
+			tls_insecure,
+			tls_utls: sing_features.with_utls ? anytls_fp : null,
+			anytls_idle_session_check_interval: to_string(proxy['idle-session-check-interval']),
+			anytls_idle_session_timeout: to_string(proxy['idle-session-timeout']),
+			anytls_min_idle_session: to_string(proxy['min-idle-session']),
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		break;
+	}
+	case 'vmess':
+		config = {
+			label: proxy.name,
+			type: 'vmess',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			uuid: proxy.uuid,
+			vmess_alterid: has_value(proxy.alterId) ? to_string(proxy.alterId) : null,
+			vmess_encrypt: proxy.cipher,
+			packet_encoding: proxy['packet-encoding'],
+			tls: (proxy.tls === true) ? '1' : '0',
+			tls_sni,
+			tls_alpn: normalize_alpn(proxy.alpn),
+			tls_insecure,
+			tls_utls: sing_features.with_utls ? tls_fingerprint : null,
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		apply_transport_opts(config, proxy);
+		break;
+	case 'hysteria2':
+		if (!sing_features.with_quic) {
+			log(sprintf('Skipping unsupported %s node: %s.', proxy.type, proxy.name || proxy.server));
+			log(sprintf('Please rebuild sing-box with %s support!', 'QUIC'));
+			return null;
+		}
+		config = {
+			label: proxy.name,
+			type: 'hysteria2',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			password: proxy.password,
+			hysteria_hopping_port: normalize_mihomo_ports(proxy.ports),
+			hysteria_down_mbps: parse_mihomo_speed(proxy.down),
+			hysteria_up_mbps: parse_mihomo_speed(proxy.up),
+			hysteria_obfs_type: proxy.obfs,
+			hysteria_obfs_password: proxy['obfs-password'],
+			tls: '1',
+			tls_sni,
+			tls_alpn: normalize_alpn(proxy.alpn),
+			tls_insecure,
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		break;
+	case 'hysteria':
+		if (!sing_features.with_quic) {
+			log(sprintf('Skipping unsupported %s node: %s.', proxy.type, proxy.name || proxy.server));
+			log(sprintf('Please rebuild sing-box with %s support!', 'QUIC'));
+			return null;
+		}
+		config = {
+			label: proxy.name,
+			type: 'hysteria',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			hysteria_hopping_port: normalize_mihomo_ports(proxy.ports),
+			hysteria_auth_type: proxy['auth-str'] ? 'string' : (proxy.auth ? 'base64' : null),
+			hysteria_auth_payload: proxy['auth-str'] || proxy.auth,
+			hysteria_obfs_password: proxy.obfs,
+			hysteria_down_mbps: parse_mihomo_speed(proxy.down),
+			hysteria_up_mbps: parse_mihomo_speed(proxy.up),
+			tls: '1',
+			tls_sni,
+			tls_alpn: normalize_alpn(proxy.alpn),
+			tls_insecure,
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		break;
+	case 'vless':
+		config = {
+			label: proxy.name,
+			type: 'vless',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			uuid: proxy.uuid,
+			vless_flow: proxy.flow,
+			packet_encoding: proxy['packet-encoding'],
+			tls: (proxy.tls === true || proxy['reality-opts']) ? '1' : '0',
+			tls_sni,
+			tls_alpn: normalize_alpn(proxy.alpn),
+			tls_insecure,
+			tls_utls: sing_features.with_utls ? tls_fingerprint : null,
+			tls_reality: proxy['reality-opts'] ? '1' : '0',
+			tls_reality_public_key: proxy['reality-opts'] ? proxy['reality-opts']['public-key'] : null,
+			tls_reality_short_id: proxy['reality-opts'] ? proxy['reality-opts']['short-id'] : null,
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		apply_transport_opts(config, proxy);
+		break;
+	case 'trojan':
+		config = {
+			label: proxy.name,
+			type: 'trojan',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			password: proxy.password,
+			tls: (proxy.tls === false) ? '0' : '1',
+			tls_sni,
+			tls_alpn: normalize_alpn(proxy.alpn),
+			tls_insecure,
+			tls_utls: sing_features.with_utls ? tls_fingerprint : null,
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		apply_transport_opts(config, proxy);
+		break;
+	case 'ss': {
+		let ss_plugin = proxy.plugin;
+		if (ss_plugin === 'simple-obfs')
+			ss_plugin = 'obfs-local';
+		config = {
+			label: proxy.name,
+			type: 'shadowsocks',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			shadowsocks_encrypt_method: proxy.cipher,
+			password: proxy.password,
+			shadowsocks_plugin: ss_plugin,
+			shadowsocks_plugin_opts: proxy['plugin-opts'],
+			udp_over_tcp: bool_to_uci(proxy['udp-over-tcp']),
+			udp_over_tcp_version: to_string(proxy['udp-over-tcp-version']),
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		break;
+	}
+	case 'ssr':
+		log(sprintf('Skipping unsupported ssr node: %s.', proxy.name || proxy.server));
+		return null;
+	case 'socks5':
+	case 'socks':
+	case 'socks4':
+	case 'socks4a':
+		config = {
+			label: proxy.name,
+			type: 'socks',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			username: proxy.username,
+			password: proxy.password,
+			socks_version: (proxy.type === 'socks4a') ? '4a' : ((proxy.type === 'socks4') ? '4' : '5'),
+			tls: (proxy.tls === true) ? '1' : '0',
+			tls_sni,
+			tls_insecure,
+			tls_utls: sing_features.with_utls ? tls_fingerprint : null,
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		break;
+	case 'http':
+		config = {
+			label: proxy.name,
+			type: 'http',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			username: proxy.username,
+			password: proxy.password,
+			tls: (proxy.tls === true) ? '1' : '0',
+			tls_sni,
+			tls_insecure,
+			tls_utls: sing_features.with_utls ? tls_fingerprint : null,
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		break;
+	case 'tuic': {
+		if (!sing_features.with_quic) {
+			log(sprintf('Skipping unsupported %s node: %s.', proxy.type, proxy.name || proxy.server));
+			log(sprintf('Please rebuild sing-box with %s support!', 'QUIC'));
+			return null;
+		}
+		let tuic_heartbeat = proxy['heartbeat-interval'];
+		if (has_value(tuic_heartbeat)) {
+			tuic_heartbeat = int(tuic_heartbeat);
+			if (tuic_heartbeat >= 1000)
+				tuic_heartbeat = int(tuic_heartbeat / 1000);
+		}
+		config = {
+			label: proxy.name,
+			type: 'tuic',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			uuid: proxy.uuid,
+			password: proxy.password || proxy.token,
+			tuic_congestion_control: proxy['congestion-controller'],
+			tuic_udp_relay_mode: proxy['udp-relay-mode'],
+			tuic_udp_over_stream: bool_to_uci(proxy['udp-over-stream']),
+			tuic_enable_zero_rtt: bool_to_uci(proxy['zero-rtt-handshake']),
+			tuic_heartbeat: has_value(tuic_heartbeat) ? to_string(tuic_heartbeat) : null,
+			tls: '1',
+			tls_sni: proxy['disable-sni'] ? null : tls_sni,
+			tls_alpn: normalize_alpn(proxy.alpn),
+			tls_insecure,
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		break;
+	}
+	case 'ssh':
+		config = {
+			label: proxy.name,
+			type: 'ssh',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			username: proxy.username,
+			password: proxy.password,
+			ssh_client_version: proxy['client-version'],
+			ssh_host_key: normalize_list(proxy['host-key']),
+			ssh_host_key_algo: normalize_list(proxy['host-key-algorithms']),
+			ssh_priv_key: normalize_list(proxy['private-key']),
+			ssh_priv_key_pp: proxy['private-key-passphrase'],
+			tcp_fast_open: (proxy.tfo === true) ? '1' : null
+		};
+		break;
+	case 'wireguard': {
+		let wg_addresses = [];
+		if (has_value(proxy.ip))
+			push(wg_addresses, to_string(proxy.ip));
+		if (has_value(proxy.ipv6))
+			push(wg_addresses, to_string(proxy.ipv6));
+		config = {
+			label: proxy.name,
+			type: 'wireguard',
+			address: proxy.server,
+			port: to_string(proxy.port),
+			wireguard_local_address: length(wg_addresses) ? wg_addresses : null,
+			wireguard_private_key: proxy['private-key'],
+			wireguard_peer_public_key: proxy['public-key'],
+			wireguard_pre_shared_key: proxy['pre-shared-key'],
+			wireguard_reserved: normalize_list(proxy.reserved),
+			wireguard_mtu: to_string(proxy.mtu),
+			wireguard_persistent_keepalive_interval: to_string(proxy['persistent-keepalive'] || proxy['persistent-keepalive-interval'] || proxy.keepalive)
+		};
+		break;
+	}
+	default:
+		return null;
+	}
+
+	return config;
+}
+
+function yaml_flow_to_json(s) {
+	if (type(s) !== 'string')
+		return null;
+
+	const len = length(s);
+	let out = '';
+	let i = 0;
+	let stack = [];
+	let expect_key = false;
+
+	while (i < len) {
+		const c = substr(s, i, 1);
+
+		if (c === ' ' || c === '\t') {
+			out += c;
+			i++;
+			continue;
+		}
+
+		if (c === '{') {
+			push(stack, '{');
+			expect_key = true;
+			out += c;
+			i++;
+			continue;
+		}
+
+		if (c === '[') {
+			push(stack, '[');
+			expect_key = false;
+			out += c;
+			i++;
+			continue;
+		}
+
+		if (c === '}' || c === ']') {
+			pop(stack);
+			expect_key = false;
+			out += c;
+			i++;
+			continue;
+		}
+
+		if (c === ',') {
+			const top = stack[length(stack) - 1];
+			expect_key = (top === '{');
+			out += c;
+			i++;
+			continue;
+		}
+
+		if (c === ':') {
+			expect_key = false;
+			out += c;
+			i++;
+			continue;
+		}
+
+		if (c === '"' || c === '\'') {
+			const quote = c;
+			let str = '';
+			i++;
+			while (i < len && substr(s, i, 1) !== quote) {
+				if (substr(s, i, 1) === '\\' && i + 1 < len) {
+					str += substr(s, i, 2);
+					i += 2;
+				} else {
+					str += substr(s, i, 1);
+					i++;
+				}
+			}
+			i++;
+			if (quote === '\'')
+				str = replace(str, '"', '\\"');
+			out += '"' + str + '"';
+			continue;
+		}
+
+		const start = i;
+		while (i < len) {
+			const ch = substr(s, i, 1);
+			if (ch === ',' || ch === '}' || ch === ']')
+				break;
+			if (ch === ':' && expect_key)
+				break;
+			i++;
+		}
+
+		const token = trim(substr(s, start, i - start));
+		if (expect_key) {
+			out += '"' + replace(token, '"', '\\"') + '"';
+		} else if (token === '' || token === '~' || token === 'null') {
+			out += 'null';
+		} else if (token === 'true' || token === 'false') {
+			out += token;
+		} else if (match(token, /^-?[0-9]+(\.[0-9]+)?$/)) {
+			out += token;
+		} else {
+			out += '"' + replace(token, '"', '\\"') + '"';
+		}
+	}
+
+	return out;
+}
+
+function parse_mihomo_yaml(text) {
+	if (isEmpty(text) || type(text) !== 'string')
+		return null;
+
+	let in_proxies = false;
+	let proxies = [];
+	for (let line in split(text, '\n')) {
+		line = trim(line);
+		if (line === 'proxies:' || match(line, /^proxies:\s*$/)) {
+			in_proxies = true;
+			continue;
+		}
+		if (!in_proxies)
+			continue;
+
+		if (!line)
+			continue;
+
+		if (match(line, /^[\w-]+:\s*$/) && line !== '-')
+			break;
+
+		const m = match(line, /^-\s*(\{.*\})\s*(#.*)?$/);
+		if (!m)
+			continue;
+
+		const json_text = yaml_flow_to_json(m[1]);
+
+		let obj;
+		try {
+			obj = json_text ? json(json_text) : null;
+		} catch(e) {
+			log(sprintf('Failed to parse mihomo proxy line: %s (%s)', line, e));
+			obj = null;
+		}
+		if (obj) {
+			obj.nodetype = 'mihomo';
+			push(proxies, obj);
+		}
+	}
+
+	return length(proxies) ? proxies : null;
+}
+
 function parse_uri(uri) {
 	let config, url, params;
 
 	if (type(uri) === 'object') {
-		if (uri.nodetype === 'sip008') {
-			/* https://shadowsocks.org/guide/sip008.html */
+		if (uri.nodetype === 'mihomo') {
+			config = parse_mihomo_proxy(uri);
+		} else if (uri.nodetype === 'sip008') {
 			config = {
 				label: uri.remarks,
 				type: 'shadowsocks',
@@ -102,7 +663,6 @@ function parse_uri(uri) {
 
 		switch (uri[0]) {
 		case 'anytls':
-			/* https://github.com/anytls/anytls-go/blob/v0.0.8/docs/uri_scheme.md */
 			url = parseURL('http://' + uri[1]) || {};
 			params = url.searchParams || {};
 
@@ -134,7 +694,6 @@ function parse_uri(uri) {
 
 			break;
 		case 'hysteria':
-			/* https://github.com/HyNetwork/hysteria/wiki/URI-Scheme */
 			url = parseURL('http://' + uri[1]) || {};
 			params = url.searchParams || {};
 
@@ -166,7 +725,6 @@ function parse_uri(uri) {
 			break;
 		case 'hysteria2':
 		case 'hy2':
-			/* https://v2.hysteria.network/docs/developers/URI-Scheme/ */
 			url = parseURL('http://' + uri[1]) || {};
 			params = url.searchParams || {};
 
@@ -211,7 +769,6 @@ function parse_uri(uri) {
 
 			break;
 		case 'ss':
-			/* "Lovely" Shadowrocket format */
 			const ss_suri = split(uri[1], '#');
 			let ss_slabel = '';
 			if (length(ss_suri) <= 2) {
@@ -221,18 +778,13 @@ function parse_uri(uri) {
 					uri[1] = decodeBase64Str(ss_suri[0]) + ss_slabel;
 			}
 
-			/* Legacy format is not supported, it should be never appeared in modern subscriptions */
-			/* https://github.com/shadowsocks/shadowsocks-org/commit/78ca46cd6859a4e9475953ed34a2d301454f579e */
 
-			/* SIP002 format https://shadowsocks.org/guide/sip002.html */
 			url = parseURL('http://' + uri[1]) || {};
 
 			let ss_userinfo = {};
 			if (url.username && url.password)
-				/* User info encoded with URIComponent */
 				ss_userinfo = [url.username, urldecode(url.password)];
 			else if (url.username)
-				/* User info encoded with base64 */
 				ss_userinfo = split(decodeBase64Str(urldecode(url.username)), ':', 2);
 
 			let ss_plugin, ss_plugin_opts;
@@ -240,7 +792,6 @@ function parse_uri(uri) {
 				const ss_plugin_info = split(url.searchParams.plugin, ';', 2);
 				ss_plugin = ss_plugin_info[0];
 				if (ss_plugin === 'simple-obfs')
-					/* Fix non-standard plugin name */
 					ss_plugin = 'obfs-local';
 				ss_plugin_opts = ss_plugin_info[1];
 			}
@@ -258,7 +809,6 @@ function parse_uri(uri) {
 
 			break;
 		case 'trojan':
-			/* https://p4gefau1t.github.io/trojan-go/developer/url/ */
 			url = parseURL('http://' + uri[1]) || {};
 			params = url.searchParams || {};
 
@@ -289,7 +839,6 @@ function parse_uri(uri) {
 
 			break;
 		case 'tuic':
-			/* https://github.com/daeuniverse/dae/discussions/182 */
 			url = parseURL('http://' + uri[1]) || {};
 			params = url.searchParams || {};
 
@@ -316,11 +865,9 @@ function parse_uri(uri) {
 
 			break;
 		case 'vless':
-			/* https://github.com/XTLS/Xray-core/discussions/716 */
 			url = parseURL('http://' + uri[1]) || {};
 			params = url.searchParams || {};
 
-			/* Unsupported protocol */
 			if (params.type === 'kcp') {
 				log(sprintf('Skipping sunsupported %s node: %s.', uri[0], urldecode(url.hash) || url.hostname));
 				return null;
@@ -376,13 +923,11 @@ function parse_uri(uri) {
 
 			break;
 		case 'vmess':
-			/* "Lovely" shadowrocket format */
 			if (match(uri, /&/)) {
 				log(sprintf('Skipping unsupported %s format.', uri[0]));
 				return null;
 			}
 
-			/* https://github.com/2dust/v2rayN/wiki/Description-of-VMess-share-link */
 			try {
 				uri = json(decodeBase64Str(uri[1])) || {};
 			} catch(e) {
@@ -393,7 +938,6 @@ function parse_uri(uri) {
 			if (uri.v != '2') {
 				log(sprintf('Skipping unsupported %s format.', uri[0]));
 				return null;
-			/* Unsupported protocol */
 			} else if (uri.net === 'kcp') {
 				log(sprintf('Skipping unsupported %s node: %s.', uri[0], uri.ps || uri.add));
 				return null;
@@ -404,13 +948,6 @@ function parse_uri(uri) {
 
 				return null;
 			}
-			/*
-			 * https://www.v2fly.org/config/protocols/vmess.html#vmess-md5-%E8%AE%A4%E8%AF%81%E4%BF%A1%E6%81%AF-%E6%B7%98%E6%B1%B0%E6%9C%BA%E5%88%B6
-			 * else if (uri.aid && int(uri.aid) !== 0) {
-			 * 	log(sprintf('Skipping unsupported %s node: %s.', uri[0], uri.ps || uri.add));
-			 * 	return null;
-			 * }
-			 */
 
 			config = {
 				label: uri.ps ? urldecode(uri.ps) : null,
@@ -491,15 +1028,19 @@ function main() {
 		}
 
 		let nodes;
-		try {
-			nodes = json(res).servers || json(res);
+		const mihomo_nodes = parse_mihomo_yaml(res);
+		if (mihomo_nodes) {
+			nodes = mihomo_nodes;
+		} else {
+			try {
+				nodes = json(res).servers || json(res);
 
-			/* Shadowsocks SIP008 format */
-			if (nodes[0].server && nodes[0].method)
-				map(nodes, (_, i) => nodes[i].nodetype = 'sip008');
-		} catch(e) {
-			nodes = decodeBase64Str(res);
-			nodes = nodes ? split(trim(replace(nodes, / /g, '_')), '\n') : [];
+				if (nodes[0].server && nodes[0].method)
+					map(nodes, (_, i) => nodes[i].nodetype = 'sip008');
+			} catch(e) {
+				nodes = decodeBase64Str(res);
+				nodes = nodes ? split(trim(replace(nodes, / /g, '_')), '\n') : [];
+			}
 		}
 
 		let count = 0;
@@ -518,7 +1059,7 @@ function main() {
 
 			if (filter_check(config.label))
 				log(sprintf('Skipping blacklist node: %s.', config.label));
-			else if (node_cache[groupHash][confHash] || node_cache[groupHash][nameHash])
+			else if (node_cache[groupHash][confHash] && node_cache[groupHash][nameHash])
 				log(sprintf('Skipping duplicate node: %s.', config.label));
 			else {
 				if (config.tls === '1' && allow_insecure === '1')
@@ -555,11 +1096,9 @@ function main() {
 
 	let added = 0, removed = 0;
 	uci.foreach(uciconfig, ucinode, (cfg) => {
-		/* Nodes created by the user */
 		if (!cfg.grouphash)
 			return null;
 
-		/* Empty object - failed to fetch nodes */
 		if (length(node_cache[cfg.grouphash]) === 0)
 			return null;
 
@@ -593,7 +1132,7 @@ function main() {
 	uci.commit(uciconfig);
 
 	let need_restart = (via_proxy !== '1');
-	if (!isEmpty(main_node)) {
+	if (!isEmpty(main_node) && main_node !== 'core_only') {
 		const first_server = uci.get_first(uciconfig, ucinode);
 		if (first_server) {
 			let main_urltest_nodes;

@@ -1,8 +1,3 @@
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- *
- * Copyright (C) 2022-2025 ImmortalWrt.org
- */
 
 'use strict';
 'require form';
@@ -28,10 +23,6 @@ const callFileWrite = rpc.declare({
 	params: ['path', 'data', 'append', 'mode']
 });
 
-/* ubus/rpcd caps how much data a single call can carry, so large config
- * files (e.g. subscriptions with many nodes) must be written in chunks
- * or the browser aborts the request. Mirrors the approach used by
- * luci-app-momo's editor. */
 function writeFileChunked(path, data) {
 	data = (data != null) ? String(data) : '';
 
@@ -68,11 +59,9 @@ function parseShareLink(uri, features) {
 	if (uri[0] && uri[1]) {
 		switch (uri[0]) {
 		case 'anytls':
-			/* https://github.com/anytls/anytls-go/blob/v0.0.8/docs/uri_scheme.md */
 			url = new URL('http://' + uri[1]);
 			params = url.searchParams;
 
-			/* Check if password exists */
 			if (!url.username)
 				return null;
 
@@ -104,11 +93,9 @@ function parseShareLink(uri, features) {
 
 			break;
 		case 'hysteria':
-			/* https://github.com/HyNetwork/hysteria/wiki/URI-Scheme */
 			url = new URL('http://' + uri[1]);
 			params = url.searchParams;
 
-			/* WeChat-Video / FakeTCP are unsupported by sing-box currently */
 			if (!features.with_quic || (params.get('protocol') && params.get('protocol') !== 'udp'))
 				return null;
 
@@ -132,7 +119,6 @@ function parseShareLink(uri, features) {
 			break;
 		case 'hysteria2':
 		case 'hy2':
-			/* https://v2.hysteria.network/docs/developers/URI-Scheme/ */
 			url = new URL('http://' + uri[1]);
 			params = url.searchParams;
 
@@ -175,7 +161,6 @@ function parseShareLink(uri, features) {
 			break;
 		case 'ss':
 			try {
-				/* "Lovely" Shadowrocket format */
 				try {
 					let suri = uri[1].split('#'), slabel = '';
 					if (suri.length <= 2) {
@@ -185,15 +170,12 @@ function parseShareLink(uri, features) {
 					}
 				} catch(e) { }
 
-				/* SIP002 format https://shadowsocks.org/guide/sip002.html */
 				url = new URL('http://' + uri[1]);
 
 				let userinfo;
 				if (url.username && url.password) {
-					/* User info encoded with URIComponent */
 					userinfo = [url.username, decodeURIComponent(url.password)];
 				} else if (url.username) {
-					/* User info encoded with base64 */
 					userinfo = hp.decodeBase64Str(decodeURIComponent(url.username)).split(':');
 					if (userinfo.length > 1)
 						userinfo = [userinfo[0], userinfo.slice(1).join(':')]
@@ -220,7 +202,6 @@ function parseShareLink(uri, features) {
 					shadowsocks_plugin_opts: plugin_opts
 				};
 			} catch(e) {
-				/* Legacy format https://github.com/shadowsocks/shadowsocks-org/commit/78ca46cd6859a4e9475953ed34a2d301454f579e */
 				uri = uri[1].split('@');
 				if (uri.length < 2)
 					return null;
@@ -238,11 +219,9 @@ function parseShareLink(uri, features) {
 
 			break;
 		case 'trojan':
-			/* https://p4gefau1t.github.io/trojan-go/developer/url/ */
 			url = new URL('http://' + uri[1]);
 			params = url.searchParams;
 
-			/* Check if password exists */
 			if (!url.username)
 				return null;
 
@@ -273,11 +252,9 @@ function parseShareLink(uri, features) {
 
 			break;
 		case 'tuic':
-			/* https://github.com/daeuniverse/dae/discussions/182 */
 			url = new URL('http://' + uri[1]);
 			params = url.searchParams;
 
-			/* Check if uuid exists */
 			if (!url.username)
 				return null;
 
@@ -297,16 +274,13 @@ function parseShareLink(uri, features) {
 
 			break;
 		case 'vless':
-			/* https://github.com/XTLS/Xray-core/discussions/716 */
 			url = new URL('http://' + uri[1]);
 			params = url.searchParams;
 
-			/* Unsupported protocol */
 			if (params.get('type') === 'kcp')
 				return null;
 			else if (params.get('type') === 'quic' && ((params.get('quicSecurity') && params.get('quicSecurity') !== 'none') || !features.with_quic))
 				return null;
-			/* Check if uuid and type exist */
 			if (!url.username || !params.get('type'))
 				return null;
 
@@ -354,24 +328,17 @@ function parseShareLink(uri, features) {
 
 			break;
 		case 'vmess':
-			/* "Lovely" shadowrocket format */
 			if (uri.includes('&'))
 				return null;
 
-			/* https://github.com/2dust/v2rayN/wiki/Description-of-VMess-share-link */
 			uri = JSON.parse(hp.decodeBase64Str(uri[1]));
 
 			if (uri.v != '2')
 				return null;
-			/* Unsupported protocols */
 			else if (uri.net === 'kcp')
 				return null;
 			else if (uri.net === 'quic' && ((uri.type && uri.type !== 'none') || !features.with_quic))
 				return null;
-			/* https://www.v2fly.org/config/protocols/vmess.html#vmess-md5-%E8%AE%A4%E8%AF%81%E4%BF%A1%E6%81%AF-%E6%B7%98%E6%B1%B0%E6%9C%BA%E5%88%B6
-			 * else if (uri.aid && parseInt(uri.aid) !== 0)
-			 * 	return null;
-			 */
 
 			config = {
 				label: uri.ps,
@@ -430,7 +397,7 @@ function parseShareLink(uri, features) {
 	return config;
 }
 
-function renderNodeSettings(section, data, features, main_node, routing_mode) {
+function renderNodeSettings(section, data, features, main_node) {
 	let s = section, o;
 	s.rowcolors = true;
 	s.sortable = true;
@@ -438,7 +405,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	s.modaltitle = L.bind(hp.loadModalTitle, this, _('Node'), _('Add a node'), data[0]);
 	s.sectiontitle = L.bind(hp.loadDefaultLabel, this, data[0]);
 
-	if (routing_mode !== 'custom') {
+	if (main_node !== 'core_only') {
 		o = s.option(form.Button, '_apply', _('Apply'));
 		o.editable = true;
 		o.modalonly = false;
@@ -535,7 +502,6 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	}
 	o.modalonly = true;
 
-	/* Direct config */
 	o = s.option(form.ListValue, 'proxy_protocol', _('Proxy protocol'),
 		_('Write proxy protocol in the connection header.'));
 	o.value('', _('Disable'));
@@ -544,7 +510,6 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.depends('type', 'direct');
 	o.modalonly = true;
 
-	/* AnyTLS config start */
 	o = s.option(form.Value, 'anytls_idle_session_check_interval', _('Idle session check interval'),
 		_('Interval checking for idle sessions, in seconds.'));
 	o.datatype = 'uinteger';
@@ -565,9 +530,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.placeholder = '0';
 	o.depends('type', 'anytls');
 	o.modalonly = true;
-	/* AnyTLS config end */
 
-	/* Hysteria (2) config start */
 	o = s.option(form.DynamicList, 'hysteria_hopping_port', _('Hopping port'));
 	o.depends('type', 'hysteria');
 	o.depends('type', 'hysteria2');
@@ -584,10 +547,6 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 
 	o = s.option(form.ListValue, 'hysteria_protocol', _('Protocol'));
 	o.value('udp');
-	/* WeChat-Video / FakeTCP are unsupported by sing-box currently
-	 * o.value('wechat-video');
-	 * o.value('faketcp');
-	 */
 	o.default = 'udp';
 	o.depends('type', 'hysteria');
 	o.rmempty = false;
@@ -638,7 +597,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.depends('type', 'hysteria');
 	o.modalonly = true;
 
-	o = s.option(form.Value, 'hysteria_revc_window', _('QUIC connection receive window'),
+	o = s.option(form.Value, 'hysteria_recv_window', _('QUIC connection receive window'),
 		_('The QUIC connection-level flow control window for receiving data.'));
 	o.datatype = 'uinteger';
 	o.depends('type', 'hysteria');
@@ -648,13 +607,10 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 		_('Disables Path MTU Discovery (RFC 8899). Packets will then be at most 1252 (IPv4) / 1232 (IPv6) bytes in size.'));
 	o.depends('type', 'hysteria');
 	o.modalonly = true;
-	/* Hysteria (2) config end */
 
-	/* Shadowsocks config start */
 	o = s.option(form.ListValue, 'shadowsocks_encrypt_method', _('Encrypt method'));
 	for (let i of hp.shadowsocks_encrypt_methods)
 		o.value(i);
-	/* Stream ciphers */
 	o.value('aes-128-ctr');
 	o.value('aes-192-ctr');
 	o.value('aes-256-ctr');
@@ -680,9 +636,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.depends('shadowsocks_plugin', 'obfs-local');
 	o.depends('shadowsocks_plugin', 'v2ray-plugin');
 	o.modalonly = true;
-	/* Shadowsocks config end */
 
-	/* ShadowTLS config */
 	o = s.option(form.ListValue, 'shadowtls_version', _('ShadowTLS version'));
 	o.value('1', _('v1'));
 	o.value('2', _('v2'));
@@ -692,7 +646,6 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.rmempty = false;
 	o.modalonly = true;
 
-	/* Socks config */
 	o = s.option(form.ListValue, 'socks_version', _('Socks version'));
 	o.value('4', _('Socks4'));
 	o.value('4a', _('Socks4A'));
@@ -702,7 +655,6 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.rmempty = false;
 	o.modalonly = true;
 
-	/* SSH config start */
 	o = s.option(form.Value, 'ssh_client_version', _('Client version'),
 		_('Random version will be used if empty.'));
 	o.depends('type', 'ssh');
@@ -726,9 +678,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.password = true;
 	o.depends('type', 'ssh');
 	o.modalonly = true;
-	/* SSH config end */
 
-	/* TUIC config start */
 	o = s.option(form.Value, 'uuid', _('UUID'));
 	o.password = true;
 	o.depends('type', 'tuic');
@@ -772,9 +722,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.default = '10';
 	o.depends('type', 'tuic');
 	o.modalonly = true;
-	/* Tuic config end */
 
-	/* VMess / VLESS config start */
 	o = s.option(form.ListValue, 'vless_flow', _('Flow'));
 	o.value('', _('None'));
 	o.value('xtls-rprx-vision');
@@ -809,9 +757,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 		_('Protocol parameter. Enable length block encryption.'));
 	o.depends('type', 'vmess');
 	o.modalonly = true;
-	/* VMess config end */
 
-	/* Transport config start */
 	o = s.option(form.ListValue, 'transport', _('Transport'),
 		_('No TCP transport, plain HTTP is merged into the HTTP transport.'));
 	o.value('', _('None'));
@@ -851,7 +797,6 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	}
 	o.modalonly = true;
 
-	/* gRPC config start */
 	o = s.option(form.Value, 'grpc_servicename', _('gRPC service name'));
 	o.depends('transport', 'grpc');
 	o.modalonly = true;
@@ -862,9 +807,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 		o.depends('transport', 'grpc');
 		o.modalonly = true;
 	}
-	/* gRPC config end */
 
-	/* HTTP(Upgrade) config start */
 	o = s.option(form.DynamicList, 'http_host', _('Host'));
 	o.datatype = 'hostname';
 	o.depends('transport', 'http');
@@ -901,9 +844,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.depends('transport', 'grpc');
 	o.depends({'transport': 'http', 'tls': '1'});
 	o.modalonly = true;
-	/* HTTP config end */
 
-	/* WebSocket config start */
 	o = s.option(form.Value, 'ws_host', _('Host'));
 	o.depends('transport', 'ws');
 	o.modalonly = true;
@@ -923,7 +864,6 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.value('Sec-WebSocket-Protocol');
 	o.depends('transport', 'ws');
 	o.modalonly = true;
-	/* WebSocket config end */
 
 	o = s.option(form.ListValue, 'packet_encoding', _('Packet encoding'));
 	o.value('', _('none'));
@@ -932,9 +872,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.depends('type', 'vless');
 	o.depends('type', 'vmess');
 	o.modalonly = true;
-	/* Transport config end */
 
-	/* Wireguard config start */
 	o = s.option(form.DynamicList, 'wireguard_local_address', _('Local address'),
 		_('List of IP (v4 or v6) addresses prefixes to be assigned to the interface.'));
 	o.datatype = 'cidr';
@@ -980,9 +918,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.datatype = 'uinteger';
 	o.depends('type', 'wireguard');
 	o.modalonly = true;
-	/* Wireguard config end */
 
-	/* Mux config start */
 	o = s.option(form.Flag, 'multiplex', _('Multiplex'));
 	o.depends('type', 'shadowsocks');
 	o.depends('type', 'trojan');
@@ -1039,9 +975,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.datatype = 'uinteger';
 	o.depends('multiplex_brutal', '1');
 	o.modalonly = true;
-	/* Mux config end */
 
-	/* TLS config start */
 	o = s.option(form.Flag, 'tls', _('TLS'));
 	o.depends('type', 'anytls');
 	o.depends('type', 'http');
@@ -1197,9 +1131,7 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 		o.depends('tls_reality', '1');
 		o.modalonly = true;
 	}
-	/* TLS config end */
 
-	/* Extra settings start */
 	o = s.option(form.Flag, 'tcp_fast_open', _('TCP fast open'));
 	o.modalonly = true;
 
@@ -1222,23 +1154,20 @@ function renderNodeSettings(section, data, features, main_node, routing_mode) {
 	o.default = '2';
 	o.depends('udp_over_tcp', '1');
 	o.modalonly = true;
-	/* Extra settings end */
 
 	return s;
 }
 
-/* When a "Subscription" row under Core Config is deleted, only the uci
- * section is removed - the cached <id>.json file fetched by
- * update_custom_config.uc is left behind on disk. Clean up any such
- * orphaned files (i.e. files whose uci section no longer exists) so
- * that deleting a subscription actually removes it, same as deleting
- * an uploaded file does. */
+function genProfileId() {
+	return 'p' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
 function cleanupOrphanSubscriptionFiles() {
 	const dir = '/etc/homeproxy/custom/.subscriptions';
 
 	return L.resolveDefault(fs.list(dir), []).then((entries) => {
 		const known = {};
-		uci.sections('homeproxy', 'custom_profile', (s) => { known[s['.name']] = true; });
+		uci.sections('homeproxy', 'custom_profile', (s) => { if (s.id) known[s.id] = true; });
 
 		const jobs = [];
 		for (let entry of entries) {
@@ -1269,12 +1198,6 @@ return view.extend({
 		});
 	},
 
-	/* The Core Config Editor tab writes a plain file outside UCI, so a
-	 * save there produces no UCI diff. Only hand off to the normal
-	 * "apply changes" flow (which shows the pending-changes dialog and
-	 * triggers a service reload) when there is an actual UCI diff to
-	 * apply; otherwise just save silently, with no popup and no
-	 * automatic restart. */
 	handleSaveApply(ev, mode) {
 		return this.handleSave(ev).then(() => {
 			return uci.changes().then((changes) => {
@@ -1287,10 +1210,8 @@ return view.extend({
 	render(data) {
 		let m, s, o, ss, so;
 		let main_node = uci.get(data[0], 'config', 'main_node');
-		let routing_mode = uci.get(data[0], 'config', 'routing_mode');
 		let features = data[1];
 
-		/* Cache subscription information, it will be called multiple times */
 		let subinfo = [];
 		for (let suburl of (uci.get(data[0], 'subscription', 'subscription_url') || [])) {
 			const url = new URL(suburl);
@@ -1303,11 +1224,9 @@ return view.extend({
 
 		s = m.section(form.NamedSection, 'subscription', 'homeproxy');
 
-		/* Node settings start */
-		/* User nodes start */
 		s.tab('node', _('Nodes'));
 		o = s.taboption('node', form.SectionValue, '_node', form.GridSection, 'node');
-		ss = renderNodeSettings(o.subsection, data, features, main_node, routing_mode);
+		ss = renderNodeSettings(o.subsection, data, features, main_node);
 		ss.addremove = true;
 		ss.filter = function(section_id) {
 			for (let info of subinfo)
@@ -1316,8 +1235,6 @@ return view.extend({
 
 			return true;
 		}
-		/* Import subscription links start */
-		/* Thanks to luci-app-shadowsocks-libev */
 		ss.handleLinkImport = function() {
 			let textarea = new ui.Textarea();
 			ui.showModal(_('Import share links'), [
@@ -1334,7 +1251,6 @@ return view.extend({
 						click: ui.createHandlerFn(this, () => {
 							let input_links = textarea.getValue().trim().split('\n');
 							if (input_links && input_links[0]) {
-								/* Remove duplicate lines */
 								input_links = input_links.reduce((pre, cur) =>
 									(!pre.includes(cur) && pre.push(cur), pre), []);
 
@@ -1377,7 +1293,7 @@ return view.extend({
 				])
 			])
 		}
-		ss.renderSectionAdd = function(/* ... */) {
+		ss.renderSectionAdd = function() {
 			let el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments),
 				nameEl = el.querySelector('.cbi-section-create-name');
 
@@ -1405,22 +1321,16 @@ return view.extend({
 
 			return el;
 		}
-		/* Import subscription links end */
-		/* User nodes end */
 
-		/* Subscription nodes start */
 		for (const info of subinfo) {
 			s.tab('sub_' + info.hash, _('Sub (%s)').format(info.title));
 			o = s.taboption('sub_' + info.hash, form.SectionValue, '_sub_' + info.hash, form.GridSection, 'node');
-			ss = renderNodeSettings(o.subsection, data, features, main_node, routing_mode);
+			ss = renderNodeSettings(o.subsection, data, features, main_node);
 			ss.filter = function(section_id) {
 				return (uci.get(data[0], section_id, 'grouphash') === info.hash);
 			}
 		}
-		/* Subscription nodes end */
-		/* Node settings end */
 
-		/* Subscriptions settings start */
 		s.tab('subscription', _('Subscriptions'));
 
 		o = s.taboption('subscription', form.Flag, 'auto_update', _('Auto update'),
@@ -1549,9 +1459,7 @@ return view.extend({
 
 			return this.map.save(null, true);
 		}
-		/* Subscriptions settings end */
 
-		/* Core config settings start */
 		s.tab('core_config', _('Core Config'));
 
 		o = s.taboption('core_config', form.FileUpload, '_upload_profile', _('Upload Profile'));
@@ -1570,8 +1478,29 @@ return view.extend({
 		ss.sortable = true;
 		ss.modaltitle = _('Edit Subscription');
 		ss.remove = function(section_id) {
-			return L.resolveDefault(fs.remove(`/etc/homeproxy/custom/.subscriptions/${section_id}.json`), null).then(() => {
+			const profile_id = uci.get(data[0], section_id, 'id') || section_id;
+			return L.resolveDefault(fs.remove(`/etc/homeproxy/custom/.subscriptions/${profile_id}.json`), null).then(() => {
 				return form.GridSection.prototype.remove.apply(this, [section_id]);
+			});
+		};
+
+		so = ss.option(form.Value, 'id', _('Internal ID'));
+		so.modalonly = true;
+		so.readonly = true;
+		so.rmempty = false;
+		so.load = function(section_id) {
+			let id = uci.get(data[0], section_id, 'id');
+			if (!id) {
+				id = genProfileId();
+				uci.set(data[0], section_id, 'id', id);
+			}
+			return id;
+		};
+		so.render = function() {
+			return Promise.resolve(form.Value.prototype.render.apply(this, arguments)).then((node) => {
+				if (node && node.style)
+					node.style.display = 'none';
+				return node;
 			});
 		};
 
@@ -1605,12 +1534,13 @@ return view.extend({
 		so.modalonly = false;
 		so.onclick = function(ev, section_id) {
 			const label = uci.get(data[0], section_id, 'label') || section_id;
+			const profile_id = uci.get(data[0], section_id, 'id') || section_id;
 
 			ui.showModal(_('Updating Subscription'), [
 				E('p', { 'class': 'spinning' }, _('Fetching "%s" ...').format(label))
 			]);
 
-			return callUpdateSubscription(section_id).then((res) => {
+			return callUpdateSubscription(profile_id).then((res) => {
 				ui.hideModal();
 				if (!res || res.result !== true) {
 					ui.addNotification(null, E('p', _('Failed to fetch "%s". Check the subscription URL and try again.').format(label)));
@@ -1636,15 +1566,26 @@ return view.extend({
 		so.rmempty = false;
 		so.value('sing-box/1.13.16');
 
+		so = ss.option(form.Flag, 'auto_update_enabled', _('Auto Update'));
+		so.default = '0';
+		so.modalonly = true;
+		so.rmempty = false;
+
+		so = ss.option(form.Value, 'auto_update_interval', _('Update Interval (minutes)'));
+		so.default = '1440';
+		so.placeholder = '1440';
+		so.datatype = 'uinteger';
+		so.modalonly = true;
+		so.rmempty = false;
+		so.depends('auto_update_enabled', '1');
+
 		so = ss.option(form.ListValue, 'prefer', _('Prefer'));
 		so.default = 'local';
 		so.rmempty = false;
 		so.modalonly = true;
-		so.value('remote', _('Remote'));
 		so.value('local', _('Local'));
-		/* Core config settings end */
+		so.value('remote', _('Remote'));
 
-		/* Core config editor start */
 		s.tab('core_config_editor', _('Core Config Editor'));
 
 		let editor_files = [];
@@ -1656,9 +1597,11 @@ return view.extend({
 				});
 		}
 		uci.sections(data[0], 'custom_profile', (sec) => {
+			if (!sec.id)
+				return;
 			editor_files.push({
-				path: `/etc/homeproxy/custom/.subscriptions/${sec['.name']}.json`,
-				title: _('Subscription: %s').format(sec.label || sec['.name'])
+				path: `/etc/homeproxy/custom/.subscriptions/${sec.id}.json`,
+				title: _('Subscription: %s').format(sec.label || sec.id)
 			});
 		});
 
@@ -1691,7 +1634,6 @@ return view.extend({
 				return;
 			return writeFileChunked(path, formvalue);
 		};
-		/* Core config editor end */
 
 		return m.render();
 	}

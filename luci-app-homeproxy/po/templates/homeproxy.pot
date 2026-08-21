@@ -31,6 +31,10 @@ msgstr ""
 msgid "<strong>Save your configuration before uploading files!</strong>"
 msgstr ""
 
+#: htdocs/luci-static/resources/view/homeproxy/client.js:676
+msgid "API secret"
+msgstr ""
+
 #: htdocs/luci-static/resources/view/homeproxy/server.js:664
 msgid "API token"
 msgstr ""
@@ -72,16 +76,8 @@ msgstr ""
 msgid "Add a node"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:405
-msgid "Add a routing node"
-msgstr ""
-
 #: htdocs/luci-static/resources/view/homeproxy/client.js:576
 msgid "Add a routing rule"
-msgstr ""
-
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1320
-msgid "Add a rule set"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/server.js:156
@@ -396,10 +392,6 @@ msgstr ""
 msgid "Connection check"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:255
-msgid "Custom routing"
-msgstr ""
-
 #: htdocs/luci-static/resources/view/homeproxy/client.js:618
 msgid "DNS"
 msgstr ""
@@ -439,6 +431,10 @@ msgstr ""
 msgid "DTLS"
 msgstr ""
 
+#: htdocs/luci-static/resources/view/homeproxy/status.js:472
+msgid "Dashboard version"
+msgstr ""
+
 #: htdocs/luci-static/resources/view/homeproxy/status.js:136
 msgid "Debug"
 msgstr ""
@@ -472,10 +468,6 @@ msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:877
 msgid "Default DNS strategy"
-msgstr ""
-
-#: htdocs/luci-static/resources/view/homeproxy/client.js:357
-msgid "Default outbound"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:376
@@ -2072,10 +2064,6 @@ msgstr ""
 msgid "Routing mode"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:405
-msgid "Routing node"
-msgstr ""
-
 #: htdocs/luci-static/resources/view/homeproxy/client.js:264
 msgid "Routing ports"
 msgstr ""
@@ -2086,12 +2074,6 @@ msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:1311
 msgid "Rule Set"
-msgstr ""
-
-#: htdocs/luci-static/resources/view/homeproxy/client.js:646
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1119
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1320
-msgid "Rule set"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:661
@@ -2986,6 +2968,10 @@ msgstr ""
 msgid "quic-go / uquic chrome"
 msgstr ""
 
+#: htdocs/luci-static/resources/view/homeproxy/client.js:681
+msgid "sing-box dashboard"
+msgstr ""
+
 #: htdocs/luci-static/resources/view/homeproxy/status.js:285
 msgid "sing-box client"
 msgstr ""
@@ -3099,7 +3085,7 @@ msgstr ""
 msgid "-- none --"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:251
+#: htdocs/luci-static/resources/view/homeproxy/client.js:329
 msgid "Dashboard"
 msgstr ""
 

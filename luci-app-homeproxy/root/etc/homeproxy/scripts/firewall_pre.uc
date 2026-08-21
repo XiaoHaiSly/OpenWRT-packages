@@ -1,4 +1,4 @@
-#!/usr/bin/ucode
+#!/usr/bin/ucode -S
 
 'use strict';
 
@@ -10,15 +10,12 @@ const cfgname = 'homeproxy';
 const uci = cursor();
 uci.load(cfgname);
 
-const routing_mode = uci.get(cfgname, 'config', 'routing_mode') || 'bypass_mainland_china',
+const main_node = uci.get(cfgname, 'config', 'main_node') || 'nil',
       proxy_mode = uci.get(cfgname, 'config', 'proxy_mode') || 'redirect_tproxy';
 
 let outbound_node, tun_name;
 if (match(proxy_mode, /tun/)) {
-	if (routing_mode === 'custom')
-		outbound_node = uci.get(cfgname, 'routing', 'default_outbound') || 'nil';
-	else
-		outbound_node = uci.get(cfgname, 'config', 'main_node') || 'nil';
+	outbound_node = main_node;
 
 	if (outbound_node !== 'nil')
 		tun_name = uci.get(cfgname, 'infra', 'tun_name') || 'singtun0';

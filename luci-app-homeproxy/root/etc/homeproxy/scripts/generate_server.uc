@@ -1,9 +1,4 @@
 #!/usr/bin/ucode
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- *
- * Copyright (C) 2023 ImmortalWrt.org
- */
 
 'use strict';
 
@@ -15,7 +10,6 @@ import {
 	removeBlankAttrs, HP_DIR, RUN_DIR
 } from 'homeproxy';
 
-/* UCI config start */
 const uci = cursor();
 
 const uciconfig = 'homeproxy';
@@ -24,11 +18,9 @@ uci.load(uciconfig);
 const uciserver = 'server';
 
 const log_level = uci.get(uciconfig, uciserver, 'log_level') || 'warn';
-/* UCI config end */
 
 const config = {};
 
-/* Log */
 config.log = {
 	disabled: false,
 	level: log_level,
@@ -56,10 +48,8 @@ uci.foreach(uciconfig, uciserver, (cfg) => {
 		udp_timeout: strToTime(cfg.udp_timeout),
 		network: cfg.network,
 
-		/* AnyTLS */
 		padding_scheme: cfg.anytls_padding_scheme,
 
-		/* Hysteria */
 		up_mbps: strToInt(cfg.hysteria_up_mbps),
 		down_mbps: strToInt(cfg.hysteria_down_mbps),
 		obfs: cfg.hysteria_obfs_type ? {
@@ -67,37 +57,31 @@ uci.foreach(uciconfig, uciserver, (cfg) => {
 			password: cfg.hysteria_obfs_password
 		} : cfg.hysteria_obfs_password,
 		recv_window_conn: strToInt(cfg.hysteria_recv_window_conn),
-		recv_window_client: strToInt(cfg.hysteria_revc_window_client),
+		recv_window_client: strToInt(cfg.hysteria_recv_window_client),
 		max_conn_client: strToInt(cfg.hysteria_max_conn_client),
 		disable_mtu_discovery: strToBool(cfg.hysteria_disable_mtu_discovery),
 		ignore_client_bandwidth: strToBool(cfg.hysteria_ignore_client_bandwidth),
 		masquerade: cfg.hysteria_masquerade,
 
-		/* Shadowsocks */
 		method: (cfg.type === 'shadowsocks') ? cfg.shadowsocks_encrypt_method : null,
 		password: (cfg.type in ['shadowsocks', 'shadowtls']) ? cfg.password : null,
 
-		/* Tuic */
 		congestion_control: cfg.tuic_congestion_control,
 		auth_timeout: strToTime(cfg.tuic_auth_timeout),
 		zero_rtt_handshake: strToBool(cfg.tuic_enable_zero_rtt),
 		heartbeat: strToTime(cfg.tuic_heartbeat),
 
-		/* AnyTLS / HTTP / Hysteria (2) / Mixed / Socks / Trojan / Tuic / VLESS / VMess */
 		users: (cfg.type !== 'shadowsocks') ? [
 			{
 				name: !(cfg.type in ['http', 'mixed', 'naive', 'socks']) ? 'cfg-' + cfg['.name'] + '-server' : null,
 				username: cfg.username,
 				password: cfg.password,
 
-				/* Hysteria */
 				auth: (cfg.hysteria_auth_type === 'base64') ? cfg.hysteria_auth_payload : null,
 				auth_str: (cfg.hysteria_auth_type === 'string') ? cfg.hysteria_auth_payload : null,
 
-				/* Tuic */
 				uuid: cfg.uuid,
 
-				/* VLESS / VMess */
 				flow: cfg.vless_flow,
 				alterId: strToInt(cfg.vmess_alterid)
 			}
@@ -129,7 +113,7 @@ uci.foreach(uciconfig, uciserver, (cfg) => {
 				email: cfg.tls_acme_email,
 				provider: cfg.tls_acme_provider,
 				disable_http_challenge: strToBool(cfg.tls_acme_dhc),
-				disable_tls_alpn_challenge: (cfg.tls_acme_dtac),
+				disable_tls_alpn_challenge: strToBool(cfg.tls_acme_dtac),
 				alternative_http_port: strToInt(cfg.tls_acme_ahp),
 				alternative_tls_port: strToInt(cfg.tls_acme_atp),
 				external_account: (cfg.tls_acme_external_account === '1') ? {
@@ -147,7 +131,6 @@ uci.foreach(uciconfig, uciserver, (cfg) => {
 			ech: (cfg.tls_ech_key) ? {
 				enabled: true,
 				key: split(cfg.tls_ech_key, '\n'),
-				// config: split(cfg.tls_ech_config, '\n')
 			} : null,
 			reality: (cfg.tls_reality === '1') ? {
 				enabled: true,

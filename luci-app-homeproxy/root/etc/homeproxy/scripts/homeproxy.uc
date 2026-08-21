@@ -1,19 +1,10 @@
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- *
- * Copyright (C) 2023 ImmortalWrt.org
- */
 
-import { mkstemp } from 'fs';
+import { mkstemp, popen } from 'fs';
 import { urldecode_params } from 'luci.http';
 
-/* Global variables start */
 export const HP_DIR = '/etc/homeproxy';
 export const RUN_DIR = '/var/run/homeproxy';
-/* Global variables end */
 
-/* Utilities start */
-/* Kanged from luci-app-commands */
 export function shellQuote(s) {
 	return `'${replace(s, "'", "'\\''")}'`;
 };
@@ -66,19 +57,46 @@ export function getTime(epoch) {
 
 };
 
-export function wGET(url, ua) {
+export function wGET(url, ua, proxyUrl) {
 	if (!url || type(url) !== 'string')
 		return null;
 
 	if (!ua)
 		ua = 'v2rayNG/2.3.2';
 
-	const output = executeCommand(`/usr/bin/wget -qO- --user-agent ${shellQuote(ua)} --timeout=10 ${shellQuote(url)}`) || {};
-	return trim(output.stdout);
-};
-/* Utilities end */
+	const maxSize = 4 * 1024 * 1024;
+	const proxyArg = proxyUrl ? `--proxy ${shellQuote(proxyUrl)} ` : '';
 
-/* String helper start */
+	const outfd = popen(
+		`/usr/bin/curl -fsSL --compressed --retry 3 --retry-all-errors --retry-delay 1 ` +
+		`--connect-timeout 10 --max-time 60 ` +
+		`--max-filesize ${maxSize} ${proxyArg}-A ${shellQuote(ua)} ${shellQuote(url)} ` +
+		`2>/dev/null`
+	);
+	if (!outfd)
+		return null;
+
+	let chunks = [], total = 0, oversized = false;
+	while (true) {
+		const chunk = outfd.read(64 * 1024);
+		if (chunk === null || chunk === '')
+			break;
+		total += length(chunk);
+		if (total > maxSize) {
+			oversized = true;
+			break;
+		}
+		push(chunks, chunk);
+	}
+	const exitcode = outfd.close();
+	const output = join('', chunks);
+
+	if (exitcode !== 0 || oversized || isBinary(output))
+		return null;
+
+	return trim(output);
+};
+
 export function isEmpty(res) {
 	return !res || res === 'nil' || (type(res) in ['array', 'object'] && length(res) === 0);
 };
@@ -133,9 +151,7 @@ export function validation(datatype, data) {
 	const ret = system(`/sbin/validate_data ${shellQuote(datatype)} ${shellQuote(data)} 2>/dev/null`);
 	return (ret === 0);
 };
-/* String helper end */
 
-/* String parser start */
 export function decodeBase64Str(str) {
 	if (isEmpty(str))
 		return null;
@@ -227,4 +243,3 @@ export function parseURL(url) {
 
 	return objurl;
 };
-/* String parser end */

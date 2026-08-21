@@ -40,6 +40,10 @@ msgstr ""
 msgid "<strong>Save your configuration before uploading files!</strong>"
 msgstr "<strong>上传文件前请先保存配置！</strong>"
 
+#: htdocs/luci-static/resources/view/homeproxy/client.js:676
+msgid "API secret"
+msgstr "API 密钥"
+
 #: htdocs/luci-static/resources/view/homeproxy/server.js:664
 msgid "API token"
 msgstr "API 令牌"
@@ -81,17 +85,9 @@ msgstr "新增 DNS 服务器"
 msgid "Add a node"
 msgstr "新增节点"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:405
-msgid "Add a routing node"
-msgstr "新增路由节点"
-
 #: htdocs/luci-static/resources/view/homeproxy/client.js:576
 msgid "Add a routing rule"
 msgstr "新增路由规则"
-
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1320
-msgid "Add a rule set"
-msgstr "新增规则集"
 
 #: htdocs/luci-static/resources/view/homeproxy/server.js:156
 msgid "Add a server"
@@ -258,7 +254,6 @@ msgstr "Base64"
 msgid "Based on google/gvisor."
 msgstr "基于 google/gvisor。"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1341
 msgid "Binary file"
 msgstr "二进制文件"
 
@@ -415,10 +410,6 @@ msgstr "拥塞控制算法"
 msgid "Connection check"
 msgstr "连接检查"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:255
-msgid "Custom routing"
-msgstr "自定义路由"
-
 #: htdocs/luci-static/resources/view/homeproxy/client.js:618
 msgid "DNS"
 msgstr "DNS"
@@ -458,6 +449,10 @@ msgstr "DNS01 验证"
 msgid "DTLS"
 msgstr "DTLS"
 
+#: htdocs/luci-static/resources/view/homeproxy/status.js:472
+msgid "Dashboard version"
+msgstr "仪表盘版本"
+
 #: htdocs/luci-static/resources/view/homeproxy/status.js:136
 msgid "Debug"
 msgstr "调试"
@@ -492,10 +487,6 @@ msgstr "用于解析服务器地址中的域名的默认 DNS 服务器。"
 #: htdocs/luci-static/resources/view/homeproxy/client.js:877
 msgid "Default DNS strategy"
 msgstr "默认 DNS 解析策略"
-
-#: htdocs/luci-static/resources/view/homeproxy/client.js:357
-msgid "Default outbound"
-msgstr "默认出站"
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:376
 msgid "Default outbound DNS"
@@ -1251,9 +1242,10 @@ msgstr "信息"
 msgid "Interface Control"
 msgstr "接口控制"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:560
+#: htdocs/luci-static/resources/view/homeproxy/client.js:361
+#: htdocs/luci-static/resources/view/homeproxy/client.js:427
 msgid "Interrupt existing connections"
-msgstr "中断现有连接"
+msgstr "自动切换时断开旧连接"
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:561
 msgid "Interrupt existing connections when the selected outbound has changed."
@@ -2111,10 +2103,6 @@ msgstr "路由设置"
 msgid "Routing mode"
 msgstr "路由模式"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:405
-msgid "Routing node"
-msgstr "路由节点"
-
 #: htdocs/luci-static/resources/view/homeproxy/client.js:264
 msgid "Routing ports"
 msgstr "路由端口"
@@ -2125,12 +2113,6 @@ msgstr "路由规则"
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:1311
 msgid "Rule Set"
-msgstr "规则集"
-
-#: htdocs/luci-static/resources/view/homeproxy/client.js:646
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1119
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1320
-msgid "Rule set"
 msgstr "规则集"
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:661
@@ -3063,6 +3045,10 @@ msgstr "私钥"
 msgid "quic-go / uquic chrome"
 msgstr "quic-go / uquic chrome"
 
+#: htdocs/luci-static/resources/view/homeproxy/client.js:681
+msgid "sing-box dashboard"
+msgstr "sing-box 面板"
+
 #: htdocs/luci-static/resources/view/homeproxy/status.js:285
 msgid "sing-box client"
 msgstr "sing-box 客户端"
@@ -3173,6 +3159,10 @@ msgstr "核心配置文件"
 msgid "-- none --"
 msgstr "-- 无 --"
 
+#: htdocs/luci-static/resources/view/homeproxy/client.js:329
+msgid "Dashboard"
+msgstr "仪表盘"
+
 #: htdocs/luci-static/resources/view/homeproxy/client.js:264
 msgid "Restart service"
 msgstr "重启服务"
@@ -3266,6 +3256,14 @@ msgid "User Agent"
 msgstr "用户代理（UA）"
 
 #: htdocs/luci-static/resources/view/homeproxy/node.js:1533
+msgid "Auto Update"
+msgstr "自动更新"
+
+#: htdocs/luci-static/resources/view/homeproxy/node.js:1538
+msgid "Update Interval (minutes)"
+msgstr "更新间隔（分钟）"
+
+#: htdocs/luci-static/resources/view/homeproxy/node.js:1543
 msgid "Prefer"
 msgstr "优先"
 
@@ -3280,3 +3278,79 @@ msgstr "正在更新订阅"
 #: htdocs/luci-static/resources/view/homeproxy/node.js:1556
 msgid "Fetching \"%s\" ..."
 msgstr "正在拉取“%s” ..."
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js:295
+msgid "Active core"
+msgstr "当前核心"
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js:476
+msgid "Core management"
+msgstr "核心管理"
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js:191
+msgid "Checking..."
+msgstr "检查中..."
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js:238
+msgid "Installing..."
+msgstr "安装中..."
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Update to latest"
+msgstr "更新最新版"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Update to latest"
+msgstr "更新最新版"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Restore firmware version"
+msgstr "恢复初始版本"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Restoring firmware-shipped version..."
+msgstr "正在恢复初始自带版本..."
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Restored successfully"
+msgstr "恢复成功"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Restore failed"
+msgstr "恢复失败"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Checking requirements..."
+msgstr "正在探测构架..."
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Installation failed"
+msgstr "安装失败"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Updated successfully"
+msgstr "更新成功"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Downloading"
+msgstr "正在下载"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Installing (service will restart)..."
+msgstr "正在安装..."
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Download failed"
+msgstr "下载失败"

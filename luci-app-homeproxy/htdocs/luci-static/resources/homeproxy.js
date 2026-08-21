@@ -1,8 +1,3 @@
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- *
- * Copyright (C) 2022-2025 ImmortalWrt.org
- */
 
 'use strict';
 'require baseclass';
@@ -22,28 +17,23 @@ return baseclass.extend({
 	},
 
 	shadowsocks_encrypt_length: {
-		/* AEAD */
 		'aes-128-gcm': 0,
 		'aes-192-gcm': 0,
 		'aes-256-gcm': 0,
 		'chacha20-ietf-poly1305': 0,
 		'xchacha20-ietf-poly1305': 0,
-		/* AEAD 2022 */
 		'2022-blake3-aes-128-gcm': 16,
 		'2022-blake3-aes-256-gcm': 32,
 		'2022-blake3-chacha20-poly1305': 32
 	},
 
 	shadowsocks_encrypt_methods: [
-		/* Stream */
 		'none',
-		/* AEAD */
 		'aes-128-gcm',
 		'aes-192-gcm',
 		'aes-256-gcm',
 		'chacha20-ietf-poly1305',
 		'xchacha20-ietf-poly1305',
-		/* AEAD 2022 */
 		'2022-blake3-aes-128-gcm',
 		'2022-blake3-aes-256-gcm',
 		'2022-blake3-chacha20-poly1305'
@@ -79,7 +69,7 @@ return baseclass.extend({
 	CBIStaticList: form.DynamicList.extend({
 		__name__: 'CBI.StaticList',
 
-		renderWidget: function(/* ... */) {
+		renderWidget: function() {
 			let dl = form.DynamicList.prototype.renderWidget.apply(this, arguments);
 			dl.querySelector('.add-item ul > li[data-value="-"]')?.remove();
 			return dl;
@@ -87,7 +77,6 @@ return baseclass.extend({
 	}),
 
 	calcStringMD5(e) {
-		/* Thanks to https://stackoverflow.com/a/41602636 */
 		let h = (a, b) => {
 			let c, d, e, f, g;
 			c = a & 2147483648;
@@ -164,7 +153,6 @@ return baseclass.extend({
 		if (!str)
 			return null;
 
-		/* Thanks to luci-app-ssr-plus */
 		str = str.replace(/-/g, '+').replace(/_/g, '/');
 		let padding = (4 - str.length % 4) % 4;
 		if (padding)
@@ -191,14 +179,12 @@ return baseclass.extend({
 			byteArr = crypto.getRandomValues(new Uint8Array(length));
 		switch (type) {
 			case 'base64':
-				/* Thanks to https://stackoverflow.com/questions/9267899 */
 				return btoa(String.fromCharCode.apply(null, byteArr));
 			case 'hex':
 				return Array.from(byteArr, (byte) =>
 					(byte & 255).toString(16).padStart(2, '0')
 				).join('');
 			case 'uuid':
-				/* Thanks to https://stackoverflow.com/a/2117523 */
 				return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, (c) =>
 					(c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
 				);
@@ -265,7 +251,6 @@ return baseclass.extend({
 	},
 
 	validateBase64Key(length, section_id, value) {
-		/* Thanks to luci-proto-wireguard */
 		if (section_id && value)
 			if (value.length !== length || !value.match(/^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/) || value[length-1] !== '=')
 				return _('Expecting: %s').format(_('valid base64 key with %d characters').format(length));

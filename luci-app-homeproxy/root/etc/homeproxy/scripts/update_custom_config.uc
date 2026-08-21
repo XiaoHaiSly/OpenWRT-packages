@@ -1,22 +1,4 @@
 #!/usr/bin/ucode -S
-/*
- * SPDX-License-Identifier: GPL-2.0-only
- *
- * Fetch one "custom_profile" (Subscription) entry: downloads its "url"
- * as a raw sing-box JSON config, saves it under
- * <HP_DIR>/custom/.subscriptions/<section_id>.json, and (if the server
- * sends a "Subscription-Userinfo" header) records used/total/expire
- * traffic info back into uci, same as HomeProxy's node subscriptions.
- *
- * Usage:
- *   ucode -S update_custom_config.uc [profile_section_id]
- *
- * With no argument, config.main_core_profile is checked: if it points
- * at a "sub:<id>" entry, that entry is refreshed. This is what the
- * auto-update cron job and "Core only" startup call.
- * With an argument, that specific profile is refreshed regardless of
- * whether it is the active one (used by the per-row "Update" button).
- */
 
 'use strict';
 
@@ -30,8 +12,6 @@ const uciconfig = 'homeproxy';
 uci.load(uciconfig);
 
 const CUSTOM_DIR = `${HP_DIR}/custom`;
-/* Hidden (dot-prefixed) so it doesn't show up in the "Upload Profile"
- * file browser, which only lists user-uploaded files by default. */
 const SUB_DIR = `${CUSTOM_DIR}/.subscriptions`;
 
 function formatFilesize(bytes) {
@@ -48,12 +28,6 @@ function formatFilesize(bytes) {
 	return sprintf('%.2f %s', size, units[i]);
 }
 
-/* Best-effort only: dumps response headers via "wget -S" to try and
- * read a "Subscription-Userinfo" header for traffic stats. Not every
- * wget build (e.g. some BusyBox variants) supports -S, so any
- * failure here is silently ignored - it must never block or fail the
- * actual config download below, which uses the plain, always-working
- * wGET() that HomeProxy's node subscriptions already rely on. */
 function fetchHeaders(url, ua) {
 	if (isEmpty(url))
 		return null;
@@ -104,29 +78,34 @@ if (isEmpty(profile_id)) {
 	exit(1);
 }
 
-const label = uci.get(uciconfig, profile_id, 'label') || profile_id,
-      info_url = uci.get(uciconfig, profile_id, 'info_url'),
-      url = uci.get(uciconfig, profile_id, 'url'),
-      user_agent = uci.get(uciconfig, profile_id, 'user_agent');
+let section_name;
+uci.foreach(uciconfig, 'custom_profile', (s) => {
+	if (s.id === profile_id)
+		section_name = s['.name'];
+});
+
+if (isEmpty(section_name)) {
+	warn(`Error: no subscription profile found with id "${profile_id}".\n`);
+	exit(1);
+}
+
+const label = uci.get(uciconfig, section_name, 'label') || profile_id,
+      info_url = uci.get(uciconfig, section_name, 'info_url'),
+      url = uci.get(uciconfig, section_name, 'url'),
+      user_agent = uci.get(uciconfig, section_name, 'user_agent');
 
 if (isEmpty(url)) {
 	warn(`Error: profile "${label}" has no subscription URL configured.\n`);
 	exit(1);
 }
 
-/* Reset stale info first, same as HomeProxy's node subscriptions */
-uci.delete(uciconfig, profile_id, 'used');
-uci.delete(uciconfig, profile_id, 'total');
-uci.delete(uciconfig, profile_id, 'expire');
-uci.delete(uciconfig, profile_id, 'success');
+uci.delete(uciconfig, section_name, 'used');
+uci.delete(uciconfig, section_name, 'total');
+uci.delete(uciconfig, section_name, 'expire');
+uci.delete(uciconfig, section_name, 'success');
 
 system(`mkdir -p ${SUB_DIR}`);
 
-/* Traffic info (used/total/expire) is best-effort only, tried first
- * from a dedicated info_url if set, else from the main url's own
- * headers. Its failure (unsupported wget build, no such header,
- * network hiccup, ...) must never stop the actual config download
- * below. */
 let userinfo = parseUserinfo(fetchHeaders(!isEmpty(info_url) ? info_url : url, user_agent));
 
 const body = wGET(url, user_agent);
@@ -141,14 +120,14 @@ if (!writefile(`${SUB_DIR}/${profile_id}.json`, body)) {
 }
 
 if (userinfo.expire)
-	uci.set(uciconfig, profile_id, 'expire', getTime(userinfo.expire));
+	uci.set(uciconfig, section_name, 'expire', getTime(userinfo.expire));
 if (!isEmpty(userinfo.upload) && !isEmpty(userinfo.download))
-	uci.set(uciconfig, profile_id, 'used', formatFilesize(userinfo.upload + userinfo.download));
+	uci.set(uciconfig, section_name, 'used', formatFilesize(userinfo.upload + userinfo.download));
 if (userinfo.total)
-	uci.set(uciconfig, profile_id, 'total', formatFilesize(userinfo.total));
+	uci.set(uciconfig, section_name, 'total', formatFilesize(userinfo.total));
 
-uci.set(uciconfig, profile_id, 'update', getTime());
-uci.set(uciconfig, profile_id, 'success', '1');
+uci.set(uciconfig, section_name, 'update', getTime());
+uci.set(uciconfig, section_name, 'success', '1');
 uci.commit(uciconfig);
 
 print(`Subscription "${label}" fetched successfully.\n`);

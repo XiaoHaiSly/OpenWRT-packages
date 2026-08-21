@@ -1,11 +1,8 @@
 #!/bin/sh
-# SPDX-License-Identifier: GPL-2.0-only
-#
-# Copyright (C) 2022-2023 ImmortalWrt.org
 
 NAME="homeproxy"
 
-log_max_size="50" #KB
+log_max_size="50"
 main_log_file="/var/run/$NAME/$NAME.log"
 singc_log_file="/var/run/$NAME/sing-box-c.log"
 sings_log_file="/var/run/$NAME/sing-box-s.log"
