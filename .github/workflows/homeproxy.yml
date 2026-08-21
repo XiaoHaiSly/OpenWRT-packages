@@ -3,13 +3,14 @@ name: Test SDK Build
 # 手动触发。用真实的 ImmortalWrt SDK（apk 打包体系）走一遍
 # make defconfig + make package/luci-app-homeproxy/compile，
 # 检查包有没有被扫描到、有没有真正编出 ipk/apk。
-# 用哪份 Makefile 由你自己控制：改完仓库里的 Makefile 再手动点一次触发即可。
+
 on:
   workflow_dispatch:
 
 jobs:
   test-build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -29,45 +30,67 @@ jobs:
       - name: Download & extract ImmortalWrt SDK (x86/64, snapshot, apk)
         run: |
           SDK_URL="https://downloads.immortalwrt.org/snapshots/targets/x86/64/immortalwrt-sdk-x86-64_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
+
           curl -fSL --retry 3 -o sdk.tar.zst "$SDK_URL"
+
           mkdir -p sdk
-          tar --use-compress-program=unzstd -xf sdk.tar.zst -C sdk --strip-components=1
+
+          tar --use-compress-program=unzstd \
+            -xf sdk.tar.zst \
+            -C sdk \
+            --strip-components=1
+
           ls sdk
 
       - name: Place luci-app-homeproxy into SDK package tree
         run: |
-          mkdir -p sdk/package/test-homeproxy
-          cp -r luci-app-homeproxy sdk/package/test-homeproxy/luci-app-homeproxy
-          echo "=== 本次实际使用的 Makefile 内容 ==="
-          cat sdk/package/test-homeproxy/luci-app-homeproxy/Makefile
+          mkdir -p sdk/package/luci-app-homeproxy
 
-      - name: make defconfig (触发包扫描，等价于 menuconfig 的索引阶段)
+          cp -r luci-app-homeproxy/* sdk/package/luci-app-homeproxy/
+
+          echo "=== 本次实际使用的 Makefile 内容 ==="
+          cat sdk/package/luci-app-homeproxy/Makefile
+
+      - name: Update package indexes
+        working-directory: sdk
+        run: |
+          make package/symlinks
+
+      - name: make defconfig
         working-directory: sdk
         run: |
           echo "CONFIG_PACKAGE_luci-app-homeproxy=y" >> .config
+
           make defconfig
 
       - name: Check whether package survived the scan
         working-directory: sdk
         run: |
           echo "=== .config 中 luci-app-homeproxy 相关行 ==="
-          grep -i "luci-app-homeproxy" .config || echo "!!! .config 里完全没有 luci-app-homeproxy 相关内容 !!!"
 
-      - name: Build the package (make package/luci-app-homeproxy/compile)
+          grep -i "luci-app-homeproxy" .config || \
+          echo "!!! .config 里没有 luci-app-homeproxy !!!"
+
+      - name: Build the package
         working-directory: sdk
         run: |
-          make package/luci-app-homeproxy/{clean,compile} V=s -j$(nproc) 2>&1 | tee ../build.log || true
+          make package/luci-app-homeproxy/clean \
+               package/luci-app-homeproxy/compile \
+               V=s \
+               -j$(nproc) 2>&1 | tee ../build.log || true
 
-      - name: Check build output (ipk/apk)
+      - name: Check build output
         working-directory: sdk
         run: |
           echo "=== 搜索生成的 luci-app-homeproxy 包文件 ==="
+
           FOUND=$(find bin/ -iname "luci-app-homeproxy*" 2>/dev/null)
+
           if [ -n "$FOUND" ]; then
             echo "✅ 找到生成的包文件："
             echo "$FOUND"
           else
-            echo "❌ bin/ 目录下没有找到任何 luci-app-homeproxy 包文件"
+            echo "❌ bin/目录没有找到 luci-app-homeproxy 包"
           fi
 
       - name: Upload build log
@@ -77,7 +100,7 @@ jobs:
           name: build-log
           path: build.log
 
-      - name: Upload built package (if any)
+      - name: Upload built package
         if: always()
         uses: actions/upload-artifact@v4
         with:
