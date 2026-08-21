@@ -1,3 +1,4 @@
+
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=The modern ImmortalWrt proxy platform for ARM64/AMD64
@@ -12,6 +13,7 @@ LUCI_DEPENDS:= \
 	+curl \
 	+unzip
 
+
 LUCI_EXTRA_DEPENDS:=sing-box (>=1.14.0_alpha1)
 PKG_NAME:=luci-app-homeproxy
 
@@ -25,9 +27,5 @@ define Package/luci-app-homeproxy/conffiles
 /etc/homeproxy/resources/proxy_list.txt
 endef
 
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	-sh $(CURDIR)/update-resources.sh
-endef
-
 include $(TOPDIR)/feeds/luci/luci.mk
+
