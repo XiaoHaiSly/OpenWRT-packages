@@ -30,6 +30,8 @@ jobs:
         luci-app-substore
         luci-app-wolultra
         luci-app-adguardhome
+        node
+        sing-box
 
     steps:
       - uses: actions/checkout@v6.0.2
