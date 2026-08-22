@@ -19,12 +19,9 @@ LUCI_DEPENDS:= \
 	+unzip \
 	+ucode-mod-digest \
 	+ucode-mod-math
-LUCI_EXTRA_DEPENDS:=sing-box (>=1.14.0_alpha1)
 
 PKG_NAME:=luci-app-homeproxy
-PKG_VERSION:=1.0.0
-PKG_RELEASE:=1
-PKG_PO_VERSION:=$(PKG_VERSION)-r$(PKG_RELEASE)
+LUCI_EXTRA_DEPENDS:=sing-box (>=1.14.0_alpha1)
 
 define Package/luci-app-homeproxy/conffiles
 /etc/config/homeproxy
