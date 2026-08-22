@@ -36,11 +36,6 @@ define Package/luci-app-homeproxy/conffiles
 /etc/homeproxy/resources/proxy_list.txt
 endef
 
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	-sh $(CURDIR)/update-resources.sh
-endef
-
 include $(TOPDIR)/feeds/luci/luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature
