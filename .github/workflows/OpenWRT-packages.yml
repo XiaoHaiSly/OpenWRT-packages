@@ -27,10 +27,8 @@ jobs:
       PACKAGES: >-
         luci-app-lucky
         luci-app-homeproxy
-        luci-app-substore
         luci-app-wolultra
         luci-app-adguardhome
-        node
         sing-box
 
     steps:
@@ -39,7 +37,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build
-        uses: openwrt/gh-action-sdk@main
+        uses: sbwml/openwrt-gh-action-sdk@main
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
