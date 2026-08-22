@@ -62,7 +62,7 @@ jobs:
             
 
       - name: Build
-        uses: immortalwrt/gh-action-sdk@master
+        uses: sbwml/openwrt-gh-action-sdk@main
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
