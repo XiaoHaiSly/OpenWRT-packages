@@ -66,6 +66,7 @@ jobs:
           replacesArtifacts: true
           bodyFile: "release.txt"
           tag: ${{ github.run_number }}-${{ matrix.arch }}
+          makeLatest: ${{ matrix.arch == 'aarch64_cortex-a53' }}
 
       - name: Delete workflow runs
         env:
