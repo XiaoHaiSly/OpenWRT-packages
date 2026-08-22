@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build
-        uses: sbwml/openwrt-gh-action-sdk@main
+        uses: immortalwrt/gh-action-sdk@master
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: packages_ci
