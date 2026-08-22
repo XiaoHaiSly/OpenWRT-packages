@@ -20,8 +20,8 @@ LUCI_DEPENDS:= \
 	+ucode-mod-digest \
 	+ucode-mod-math
 
-PKG_NAME:=luci-app-homeproxy
 LUCI_EXTRA_DEPENDS:=sing-box (>=1.14.0_alpha1)
+PKG_NAME:=luci-app-homeproxy
 
 define Package/luci-app-homeproxy/conffiles
 /etc/config/homeproxy
