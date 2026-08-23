@@ -27,9 +27,9 @@ jobs:
       PACKAGES: >-
         luci-app-lucky
         luci-app-homeproxy
+        luci-app-substore
         luci-app-wolultra
         luci-app-adguardhome
-        sing-box
 
     steps:
       - uses: actions/checkout@v7
