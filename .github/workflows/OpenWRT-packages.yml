@@ -36,8 +36,6 @@ jobs:
         with:
           fetch-depth: 0
 
-
-      # Go 编译缓存（sing-box 加速）
       - name: Cache Go build
         uses: actions/cache@v4
         with:
@@ -49,8 +47,6 @@ jobs:
             go-${{ runner.os }}-${{ matrix.arch }}-
             go-${{ runner.os }}-
 
-
-      # OpenWrt 下载缓存
       - name: Cache OpenWrt downloads
         uses: actions/cache@v4
         with:
@@ -60,7 +56,6 @@ jobs:
           restore-keys: |
             openwrt-dl-${{ matrix.arch }}-
             
-
       - name: Build
         uses: sbwml/openwrt-gh-action-sdk@main
         env:
@@ -70,7 +65,6 @@ jobs:
           NO_REFRESH_CHECK: true
           IGNORE_ERRORS: true
 
-
       - name: Store packages
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -79,14 +73,12 @@ jobs:
             bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
             bin/packages/${{ matrix.arch }}/packages_ci/*.apk
 
-
       - name: Zip packages
         run: |
           shopt -s nullglob
           zip -j ${{ matrix.arch }}-${{ matrix.sdk }}.zip bin/packages/${{ matrix.arch }}/packages_ci/*.ipk bin/packages/${{ matrix.arch }}/packages_ci/*.apk
 
           echo "自用插件包" >> release.txt
-
 
       - name: Upload packages
         uses: ncipollo/release-action@v1.21.0
@@ -96,9 +88,9 @@ jobs:
           allowUpdates: true
           replacesArtifacts: true
           bodyFile: "release.txt"
-          tag: ${{ github.run_number }}-${{ matrix.arch }}
+          tag: ${{ matrix.arch }}-${{ matrix.sdk }}
+          name: OpenWrt Packages - ${{ matrix.arch }}
           makeLatest: ${{ matrix.arch == 'aarch64_cortex-a53' }}
-
 
       - name: Delete workflow runs
         env:
@@ -107,12 +99,9 @@ jobs:
           WORKFLOW_NAME: ${{ github.workflow }}
           RETAIN_DAYS: "10"
           KEEP_MINIMUM_RUNS: "2"
-
         run: |
           set -euo pipefail
-
           cutoff=$(date -u -d "${RETAIN_DAYS} days ago" +%s)
-
           mapfile -t runs < <(
             gh run list \
               --repo "$REPO" \
@@ -121,68 +110,24 @@ jobs:
               --json databaseId,createdAt \
               --jq '.[] | [.databaseId, .createdAt] | @tsv'
           )
-
           total=${#runs[@]}
-
           if [ "$total" -le "$KEEP_MINIMUM_RUNS" ]; then
             echo "No workflow runs to delete ($total <= $KEEP_MINIMUM_RUNS)"
             exit 0
           fi
-
           index=0
-
           for run in "${runs[@]}"; do
             index=$((index + 1))
-
             if [ "$index" -le "$KEEP_MINIMUM_RUNS" ]; then
               continue
             fi
-
             run_id=${run%%$'\t'*}
             created_at=${run#*$'\t'}
-
             created_epoch=$(date -u -d "$created_at" +%s)
-
             if [ "$created_epoch" -gt "$cutoff" ]; then
               continue
             fi
-
             echo "Deleting workflow run $run_id ($created_at)"
-
             gh api --method DELETE \
               "repos/$REPO/actions/runs/$run_id" || true
-          done
-
-
-      - name: Remove old Releases
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          KEEP: "60"
-
-        run: |
-          set -euo pipefail
-
-          mapfile -t tags < <(
-            gh release list \
-              --repo "$REPO" \
-              --limit 200 \
-              --json tagName,createdAt \
-              --jq 'sort_by(.createdAt) | reverse | .[].tagName'
-          )
-
-          total=${#tags[@]}
-
-          if [ "$total" -le "$KEEP" ]; then
-            echo "No old releases to delete ($total <= $KEEP)"
-            exit 0
-          fi
-
-          for tag in "${tags[@]:$KEEP}"; do
-            echo "Deleting $tag"
-
-            gh release delete "$tag" \
-              --repo "$REPO" \
-              --yes \
-              --cleanup-tag || true
           done
