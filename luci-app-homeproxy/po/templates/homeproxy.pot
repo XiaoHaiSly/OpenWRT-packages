@@ -295,8 +295,9 @@ msgstr ""
 msgid "CA provider"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:221
-msgid "CNNIC Public DNS (210.2.4.8)"
+#: htdocs/luci-static/resources/view/homeproxy/client.js:388
+#: htdocs/luci-static/resources/view/homeproxy/client.js:425
+msgid "ByteDance Public DNS (180.184.1.1)"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/node.js:700
@@ -345,8 +346,8 @@ msgstr ""
 msgid "Cipher suites"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:183
-msgid "Cisco Public DNS (208.67.222.222)"
+#: htdocs/luci-static/resources/view/homeproxy/client.js:384
+msgid "Quad9 Public DNS (9.9.9.9)"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/status.js:214
@@ -2612,11 +2613,6 @@ msgstr ""
 msgid ""
 "This is the TUIC port of the UDP over TCP protocol, designed to provide a "
 "QUIC stream based UDP relay mode that TUIC does not provide."
-msgstr ""
-
-#: htdocs/luci-static/resources/view/homeproxy/client.js:188
-#: htdocs/luci-static/resources/view/homeproxy/client.js:223
-msgid "ThreatBook Public DNS (117.50.10.10)"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:723

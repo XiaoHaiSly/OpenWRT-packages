@@ -305,9 +305,10 @@ msgstr "默认使用防火墙规则绕过中国大陆流量。"
 msgid "CA provider"
 msgstr "CA 颁发机构"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:221
-msgid "CNNIC Public DNS (210.2.4.8)"
-msgstr "CNNIC 公共 DNS（210.2.4.8）"
+#: htdocs/luci-static/resources/view/homeproxy/client.js:388
+#: htdocs/luci-static/resources/view/homeproxy/client.js:425
+msgid "ByteDance Public DNS (180.184.1.1)"
+msgstr "字节跳动公共 DNS（180.184.1.1）"
 
 #: htdocs/luci-static/resources/view/homeproxy/node.js:700
 msgid "CUBIC"
@@ -363,9 +364,9 @@ msgstr "Chromium / Cronet"
 msgid "Cipher suites"
 msgstr "密码套件"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:183
-msgid "Cisco Public DNS (208.67.222.222)"
-msgstr "思科公共 DNS（208.67.222.222）"
+#: htdocs/luci-static/resources/view/homeproxy/client.js:384
+msgid "Quad9 Public DNS (9.9.9.9)"
+msgstr "Quad9 公共 DNS（9.9.9.9）"
 
 #: htdocs/luci-static/resources/view/homeproxy/status.js:214
 msgid "Clean log"
@@ -2686,11 +2687,6 @@ msgid ""
 msgstr ""
 "这是 TUIC 的 UDP over TCP 协议移植， 旨在提供 TUIC 不提供的基于 QUIC 流的 "
 "UDP 中继模式。"
-
-#: htdocs/luci-static/resources/view/homeproxy/client.js:188
-#: htdocs/luci-static/resources/view/homeproxy/client.js:223
-msgid "ThreatBook Public DNS (117.50.10.10)"
-msgstr "微步在线公共 DNS（117.50.10.10）"
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:723
 msgid ""

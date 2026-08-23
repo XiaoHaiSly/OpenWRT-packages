@@ -1561,10 +1561,10 @@ return view.extend({
 		so.rmempty = false;
 
 		so = ss.option(form.Value, 'user_agent', _('User Agent'));
-		so.default = 'sing-box/1.13.16';
+		so.default = 'sing-box/1.14.0';
 		so.modalonly = true;
 		so.rmempty = false;
-		so.value('sing-box/1.13.16');
+		so.value('sing-box/1.14.0');
 
 		so = ss.option(form.Flag, 'auto_update_enabled', _('Auto Update'));
 		so.default = '0';

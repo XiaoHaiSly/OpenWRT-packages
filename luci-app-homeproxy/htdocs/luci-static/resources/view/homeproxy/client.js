@@ -381,12 +381,12 @@ return view.extend({
 			_('Support UDP, TCP, DoH, DoQ, DoT. TCP protocol will be used if not specified.'));
 		o.value('wan', _('WAN DNS (read from interface)'));
 		o.value('1.1.1.1', _('CloudFlare Public DNS (1.1.1.1)'));
-		o.value('208.67.222.222', _('Cisco Public DNS (208.67.222.222)'));
+		o.value('9.9.9.9', _('Quad9 Public DNS (9.9.9.9)'));
 		o.value('8.8.8.8', _('Google Public DNS (8.8.8.8)'));
 		o.value('', '---');
 		o.value('223.5.5.5', _('Aliyun Public DNS (223.5.5.5)'));
+		o.value('180.184.1.1', _('ByteDance Public DNS (180.184.1.1)'));
 		o.value('119.29.29.29', _('Tencent Public DNS (119.29.29.29)'));
-		o.value('117.50.10.10', _('ThreatBook Public DNS (117.50.10.10)'));
 		o.default = '8.8.8.8';
 		o.rmempty = false;
 		o.depends({'routing_mode': 'gfwlist', 'main_node': /^((?!core_only).)+$/});
@@ -422,9 +422,8 @@ return view.extend({
 			_('The dns server for resolving China domains. Support UDP, TCP, DoH, DoQ, DoT.'));
 		o.value('wan', _('WAN DNS (read from interface)'));
 		o.value('223.5.5.5', _('Aliyun Public DNS (223.5.5.5)'));
-		o.value('210.2.4.8', _('CNNIC Public DNS (210.2.4.8)'));
+		o.value('180.184.1.1', _('ByteDance Public DNS (180.184.1.1)'));
 		o.value('119.29.29.29', _('Tencent Public DNS (119.29.29.29)'));
-		o.value('117.50.10.10', _('ThreatBook Public DNS (117.50.10.10)'));
 		o.depends({'routing_mode': 'bypass_mainland_china', 'main_node': /^((?!core_only).)+$/});
 		o.default = '223.5.5.5';
 		o.rmempty = false;
