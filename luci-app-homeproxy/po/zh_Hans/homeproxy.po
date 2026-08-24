@@ -3293,18 +3293,48 @@ msgstr "安装中..."
 
 
 #: htdocs/luci-static/resources/view/homeproxy/status.js
-msgid "Update to latest"
-msgstr "更新最新版"
+msgid "Current version"
+msgstr "当前版本"
 
 
 #: htdocs/luci-static/resources/view/homeproxy/status.js
-msgid "Update to latest"
-msgstr "更新最新版"
+msgid "Update core"
+msgstr "更新核心"
 
 
 #: htdocs/luci-static/resources/view/homeproxy/status.js
-msgid "Restore firmware version"
-msgstr "恢复初始版本"
+msgid "Version check"
+msgstr "版本检查"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Check latest"
+msgstr "检查最新"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Update channel"
+msgstr "更新渠道"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Latest"
+msgstr "最新"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Stable"
+msgstr "稳定"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Restore core"
+msgstr "恢复核心"
+
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js
+msgid "Restore initial"
+msgstr "恢复初始"
 
 
 #: htdocs/luci-static/resources/view/homeproxy/status.js

@@ -55,6 +55,7 @@ function core_detect_arch() {
 
 const CORE_GOARCH_MAP = {
 	'x86_64': 'amd64',
+	'i386_pentium4': '386', 'i386_pentium-mmx': '386',
 	'aarch64_generic': 'arm64', 'aarch64_cortex-a53': 'arm64',
 	'aarch64_cortex-a72': 'arm64', 'aarch64_cortex-a76': 'arm64',
 	'arm_cortex-a7': 'armv7', 'arm_cortex-a7_neon-vfpv4': 'armv7',
@@ -62,11 +63,13 @@ const CORE_GOARCH_MAP = {
 	'arm_cortex-a9': 'armv7', 'arm_cortex-a9_vfpv3-d16': 'armv7',
 	'arm_cortex-a15_neon-vfpv4': 'armv7',
 	'arm_arm1176jzf-s_vfp': 'armv6', 'arm_mpcore': 'armv6',
-	'arm_xscale': 'armv5',
+	'arm_xscale': 'armv5', 'arm_arm926ej-s': 'armv5', 'arm_fa526': 'armv5',
 	'mipsel_24kc': 'mipsle', 'mipsel_74kc': 'mipsle', 'mipsel_mips32': 'mipsle',
 	'mips_24kc': 'mips', 'mips_4kec': 'mips', 'mips_mips32': 'mips',
-	'mips64_octeonplus': 'mips64',
-	'riscv64_generic': 'riscv64'
+	'mips64_octeonplus': 'mips64', 'mips64_mips64r2': 'mips64',
+	'mips64el_mips64r2': 'mips64le',
+	'riscv64_generic': 'riscv64',
+	'loongarch64_generic': 'loong64'
 };
 
 function core_goarch(owrt_arch) {
@@ -75,7 +78,11 @@ function core_goarch(owrt_arch) {
 	if (match(owrt_arch, /^arm_cortex/)) return 'armv7';
 	if (match(owrt_arch, /^mipsel/)) return 'mipsle';
 	if (match(owrt_arch, /^mips_/)) return 'mips';
+	if (match(owrt_arch, /^mips64el/)) return 'mips64le';
+	if (match(owrt_arch, /^mips64/)) return 'mips64';
 	if (match(owrt_arch, /^riscv64/)) return 'riscv64';
+	if (match(owrt_arch, /^loongarch64/)) return 'loong64';
+	if (match(owrt_arch, /^i386/)) return '386';
 	return null;
 }
 
@@ -115,7 +122,7 @@ function core_fetch_release(repo, channel) {
 }
 
 function core_repo(core) {
-	return core === 'official' ? 'SagerNet/sing-box' : 'reF1nd/sing-box-releases';
+	return 'SagerNet/sing-box';
 }
 
 function core_arch_matches(filename, goarch) {
@@ -341,7 +348,7 @@ const methods = {
 				const m = match(out, /sing-box version ([^\s]+)/);
 				if (m) {
 					version = m[1];
-					vendor = match(version, /reF1nd/i) ? 'ref1nd' : 'official';
+					vendor = 'official';
 				}
 			}
 
@@ -359,7 +366,7 @@ const methods = {
 		call: function(req) {
 			const core = req.args?.core;
 			const channel = (req.args?.channel === 'stable') ? 'stable' : 'latest';
-			if (!(core in ['official', 'ref1nd']))
+			if (core !== 'official')
 				return { error: 'illegal core' };
 
 			const data = core_fetch_release(core_repo(core), channel);
@@ -379,7 +386,7 @@ const methods = {
 		call: function(req) {
 			const core = req.args?.core;
 			const channel = (req.args?.channel === 'stable') ? 'stable' : 'latest';
-			if (!(core in ['official', 'ref1nd']))
+			if (core !== 'official')
 				return { error: 'illegal core' };
 
 			const arch = core_detect_arch();
@@ -443,7 +450,7 @@ const methods = {
 		call: function(req) {
 			const core = req.args?.core;
 			const tmp_path = req.args?.tmp_path;
-			if (!(core in ['official', 'ref1nd']) || !tmp_path)
+			if (core !== 'official' || !tmp_path)
 				return { result: false, error: 'invalid arguments' };
 
 			if (!access(CORE_BACKUP_BIN) && access(SINGBOX_BIN)) {

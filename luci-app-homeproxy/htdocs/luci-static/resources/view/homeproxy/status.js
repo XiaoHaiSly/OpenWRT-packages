@@ -165,16 +165,15 @@ function buildCoreContext() {
 			});
 		})
 	}, [
-		E('option', { 'value': 'latest', 'selected': (savedChannel !== 'stable') ? '' : null }, [ 'Latest' ]),
-		E('option', { 'value': 'stable', 'selected': (savedChannel === 'stable') ? '' : null }, [ 'Stable' ])
+		E('option', { 'value': 'latest', 'selected': (savedChannel !== 'stable') ? '' : null }, [ _('Latest') ]),
+		E('option', { 'value': 'stable', 'selected': (savedChannel === 'stable') ? '' : null }, [ _('Stable') ])
 	]));
 	const getChannel = () => channelSelect.value;
 
 	function refreshStatus() {
 		return L.resolveDefault(callCoreInfo(), {}).then((info) => {
 			if (info.installed) {
-				const vendorLabel = info.vendor === 'ref1nd' ? 'reF1nd' : 'Official';
-				vendorEl.textContent = vendorLabel;
+				vendorEl.textContent = 'sing-box';
 				vendorEl.style.color = 'green';
 				versionEl.textContent = 'v' + info.version;
 				versionEl.style.color = 'green';
@@ -191,12 +190,12 @@ function buildCoreContext() {
 		});
 	}
 
-	function buildRow(core, label) {
+	function buildUpdateRow(core, label) {
 		const remoteEl = E('strong', { 'style': 'color:gray; margin-left:8px; font-weight:normal; font-size:0.9em' }, '');
 
 		const updateBtn = registerLockable(E('button', {
 			'class': 'btn cbi-button cbi-button-action',
-			'click': async function() {
+			'click': ui.createHandlerFn(this, async function() {
 				if (busy) return;
 				setBusy(true);
 				remoteEl.textContent = _('Checking requirements...');
@@ -232,13 +231,18 @@ function buildCoreContext() {
 				remoteEl.style.color = 'green';
 				await refreshStatus();
 				setBusy(false);
-			}
+			})
 		}, [ label ]));
+
+		return E('div', { 'style': 'cbi-value-field' }, [ updateBtn, remoteEl ]);
+	}
+
+	function buildCheckRow(core) {
+		const remoteEl = E('strong', { 'style': 'color:gray; margin-left:8px; font-weight:normal; font-size:0.9em' }, '');
 
 		const checkBtn = registerLockable(E('button', {
 			'class': 'btn cbi-button',
-			'style': 'margin-left:4px',
-			'click': async function() {
+			'click': ui.createHandlerFn(this, async function() {
 				if (busy) return;
 				setBusy(true);
 				remoteEl.textContent = _('Checking...');
@@ -252,17 +256,16 @@ function buildCoreContext() {
 					remoteEl.textContent = _('Latest') + ': v' + ret.version + (ret.prerelease ? ' (pre-release)' : '');
 					remoteEl.style.color = 'darkorange';
 				}
-			}
-		}, [ _('Check update') ]));
+			})
+		}, [ _('Check latest') ]));
 
-		return E('div', { 'style': 'cbi-value-field' }, [ updateBtn, checkBtn, remoteEl ]);
+		return E('div', { 'style': 'cbi-value-field' }, [ checkBtn, remoteEl ]);
 	}
 
 	restoreBtn = registerLockable(E('button', {
 		'class': 'btn cbi-button cbi-button-negative',
-		'style': 'margin-left:8px',
 		'disabled': true,
-		'click': async function() {
+		'click': ui.createHandlerFn(this, async function() {
 			if (busy) return;
 			setBusy(true);
 			setRestoreMsg(_('Restoring firmware-shipped version...'), 'gray');
@@ -274,8 +277,8 @@ function buildCoreContext() {
 				setRestoreMsg(ret.error || _('Restore failed'), 'red');
 			}
 			setBusy(false);
-		}
-	}, [ _('Restore firmware version') ]));
+		})
+	}, [ _('Restore initial') ]));
 
 	refreshStatus();
 
@@ -283,8 +286,8 @@ function buildCoreContext() {
 		vendorRow: E('div', { 'style': 'cbi-value-field' }, [ vendorEl ]),
 		versionRow: E('div', { 'style': 'cbi-value-field' }, [ versionEl ]),
 		channelRow: E('div', { 'style': 'cbi-value-field' }, [ channelSelect ]),
-		officialRow: buildRow('official', _('Update to latest')),
-		ref1ndRow: buildRow('ref1nd', _('Update to latest')),
+		officialRow: buildUpdateRow('official', _('Update core')),
+		checkRow: buildCheckRow('official'),
 		restoreRow: E('div', { 'style': 'cbi-value-field' }, [ restoreBtn, restoreMsgEl ])
 	};
 }
@@ -454,19 +457,19 @@ return view.extend({
 		o = s.option(form.DummyValue, '_core_vendor', _('Active core'));
 		bindCoreRow(o, 'vendorRow');
 
-		o = s.option(form.DummyValue, '_core_version', _('Version'));
+		o = s.option(form.DummyValue, '_core_version', _('Current version'));
 		bindCoreRow(o, 'versionRow');
 
 		o = s.option(form.DummyValue, '_core_channel', _('Update channel'));
 		bindCoreRow(o, 'channelRow');
 
-		o = s.option(form.DummyValue, '_core_official', _('Official'));
+		o = s.option(form.DummyValue, '_core_official', _('SagerNet'));
 		bindCoreRow(o, 'officialRow');
 
-		o = s.option(form.DummyValue, '_core_ref1nd', _('reF1nd'));
-		bindCoreRow(o, 'ref1ndRow');
+		o = s.option(form.DummyValue, '_core_check', _('Version check'));
+		bindCoreRow(o, 'checkRow');
 
-		o = s.option(form.DummyValue, '_core_restore', _('Restore'));
+		o = s.option(form.DummyValue, '_core_restore', _('Restore core'));
 		bindCoreRow(o, 'restoreRow');
 
 		o = s.option(form.Value, 'github_token', _('GitHub token'));
