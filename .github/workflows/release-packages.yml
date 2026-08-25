@@ -72,7 +72,7 @@ jobs:
 
       - name: compress
         run: |
-          tar -c -z -f nikki_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz -C bin/packages/${{ matrix.arch }}/OpenWRT-packages .
+          tar -c -z -f OpenWRT-packages_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz -C bin/packages/${{ matrix.arch }}/OpenWRT-packages .
 
       - if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
         name: release
@@ -80,4 +80,3 @@ jobs:
         with:
           files: |
             OpenWRT-packages_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
-
