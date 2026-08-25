@@ -63,7 +63,7 @@ jobs:
         uses: openwrt/gh-action-sdk@main
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
-          FEEDNAME: OpenWRT-packages
+          FEEDNAME: packages
           PACKAGES: luci-app-homeproxy sing-box luci-app-substore node
           INDEX: 1
           KEY_BUILD: ${{ secrets.KEY_BUILD }}
