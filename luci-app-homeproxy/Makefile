@@ -14,11 +14,9 @@ LUCI_DEPENDS:= \
 	+kmod-tun \
 	+kmod-nft-tproxy \
 	+curl \
-	+wget-ssl \
 	+flock \
 	+unzip \
-	+ucode-mod-digest \
-	+ucode-mod-math
+	+ucode-mod-digest
 
 LUCI_EXTRA_DEPENDS:=sing-box (>=1.14.0_alpha1)
 PKG_NAME:=luci-app-homeproxy

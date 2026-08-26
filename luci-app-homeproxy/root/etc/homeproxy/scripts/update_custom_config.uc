@@ -5,7 +5,7 @@
 import { writefile } from 'fs';
 import { cursor } from 'uci';
 
-import { executeCommand, shellQuote, wGET, getTime, isEmpty, HP_DIR } from 'homeproxy';
+import { executeCommand, shellQuote, curlGET, getTime, isEmpty, HP_DIR } from 'homeproxy';
 
 const uci = cursor();
 const uciconfig = 'homeproxy';
@@ -33,10 +33,10 @@ function fetchHeaders(url, ua) {
 		return null;
 
 	const result = executeCommand(
-		`/usr/bin/wget -O /dev/null -S --user-agent ${shellQuote(ua || 'sing-box/1.14.0')} --timeout=10 ${shellQuote(url)}`
+		`/usr/bin/curl -o /dev/null -sS -D - -A ${shellQuote(ua || 'sing-box/1.14.0')} --connect-timeout 10 --max-time 15 ${shellQuote(url)}`
 	);
 
-	return result?.stderr || null;
+	return result?.stdout || null;
 }
 
 function parseUserinfo(headers) {
@@ -108,7 +108,7 @@ system(`mkdir -p ${SUB_DIR}`);
 
 let userinfo = parseUserinfo(fetchHeaders(!isEmpty(info_url) ? info_url : url, user_agent));
 
-const body = wGET(url, user_agent);
+const body = curlGET(url, user_agent);
 if (isEmpty(body)) {
 	warn(`Error: failed to fetch subscription "${label}" from ${url}.\n`);
 	exit(1);

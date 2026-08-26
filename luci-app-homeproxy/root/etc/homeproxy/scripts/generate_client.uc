@@ -3,7 +3,6 @@
 'use strict';
 
 import { readfile, writefile } from 'fs';
-import { isnan } from 'math';
 import { connect } from 'ubus';
 import { cursor } from 'uci';
 
@@ -126,18 +125,6 @@ function parse_dnsserver(server_addr, default_protocol) {
 		server_port: strToInt(server_addr.port),
 		path: (server_addr.pathname !== '/') ? server_addr.pathname : null,
 	}
-}
-
-function parse_dnsquery(strquery) {
-	if (type(strquery) !== 'array' || isEmpty(strquery))
-		return null;
-
-	let querys = [];
-	for (let i in strquery)
-		isnan(int(i)) ? push(querys, i) : push(querys, int(i));
-
-	return querys;
-
 }
 
 function generate_endpoint(node) {

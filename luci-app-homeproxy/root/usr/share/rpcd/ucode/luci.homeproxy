@@ -39,14 +39,6 @@ const SINGBOX_BIN      = '/usr/bin/sing-box';
 const CORE_BACKUP_DIR   = `${HP_DIR}/core-backup`;
 const CORE_BACKUP_BIN   = `${CORE_BACKUP_DIR}/sing-box.orig`;
 
-function core_detect_pkg_manager() {
-	for (let p in ['/usr/bin/apk', '/sbin/apk', '/usr/sbin/apk'])
-		if (access(p)) return 'apk';
-	for (let p in ['/bin/opkg', '/usr/bin/opkg'])
-		if (access(p)) return 'opkg';
-	return null;
-}
-
 function core_detect_arch() {
 	const os_rel = readfile('/etc/os-release') || '';
 	const m = match(os_rel, /OPENWRT_ARCH="?([^"\n]+)"?/);
@@ -90,12 +82,12 @@ function core_gh_token_header() {
 	let token = null;
 	const fd = popen('uci -q get homeproxy.config.github_token 2>/dev/null');
 	if (fd) { token = trim(fd.read('all')); fd.close(); }
-	return (token && length(token)) ? `--header=${shellquote(`Authorization: Bearer ${token}`)}` : '';
+	return (token && length(token)) ? `-H ${shellquote(`Authorization: Bearer ${token}`)}` : '';
 }
 
 function core_fetch_json(url) {
 	const token_hdr = core_gh_token_header();
-	const fd = popen(`wget -4 -qO- --timeout=10 ${token_hdr} ${url} 2>/dev/null`);
+	const fd = popen(`/usr/bin/curl -4 -fsSL --connect-timeout 10 --max-time 15 ${token_hdr} ${shellquote(url)} 2>/dev/null`);
 	if (!fd) return null;
 	const raw = trim(fd.read('all')); fd.close();
 	if (!length(raw)) return null;
@@ -242,7 +234,7 @@ const methods = {
 				break;
 			}
 
-			return { result: (system(`/usr/bin/wget -4 --spider -qT3 ${url} 2>"/dev/null"`, 3100) === 0) };
+			return { result: (system(`/usr/bin/curl -4 -o /dev/null -s -f --connect-timeout 3 --max-time 3 ${shellquote(url)} 2>/dev/null`, 3100) === 0) };
 		}
 	},
 
@@ -338,7 +330,6 @@ const methods = {
 
 	core_info: {
 		call: function() {
-			const pkg_manager = core_detect_pkg_manager();
 			const arch = core_detect_arch();
 
 			let version = null, vendor = null;
@@ -353,7 +344,7 @@ const methods = {
 			}
 
 			return {
-				pkg_manager, arch,
+				arch,
 				installed: !!version,
 				version, vendor,
 				has_backup: !!access(CORE_BACKUP_BIN)
@@ -438,7 +429,7 @@ const methods = {
 			const max_tries = 3;
 			let exit_code = 1;
 			for (let attempt = 1; attempt <= max_tries; attempt++) {
-				exit_code = system(`wget -4 -qO ${shellquote(tmp_path)} -c --tries=1 --timeout=30 ${shellquote(url)} 2>/dev/null`, 300000);
+				exit_code = system(`/usr/bin/curl -4 -fsSL -o ${shellquote(tmp_path)} -C - --connect-timeout 10 --max-time 30 ${shellquote(url)} 2>/dev/null`, 300000);
 				if (exit_code === 0) break;
 			}
 			return exit_code === 0 ? { result: true } : { result: false, error: 'download failed' };

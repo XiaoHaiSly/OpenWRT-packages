@@ -57,7 +57,7 @@ export function getTime(epoch) {
 
 };
 
-export function wGET(url, ua, proxyUrl) {
+export function curlGET(url, ua, proxyUrl) {
 	if (!url || type(url) !== 'string')
 		return null;
 
@@ -136,12 +136,6 @@ export function removeBlankAttrs(res) {
 		return res;
 
 	return content;
-};
-
-export function validateHostname(hostname) {
-	return (match(hostname, /^[a-zA-Z0-9_]+$/) != null ||
-		(match(hostname, /^[a-zA-Z0-9_][a-zA-Z0-9_%-.]*[a-zA-Z0-9]$/) &&
-			match(hostname, /[^0-9.]/)));
 };
 
 export function validation(datatype, data) {

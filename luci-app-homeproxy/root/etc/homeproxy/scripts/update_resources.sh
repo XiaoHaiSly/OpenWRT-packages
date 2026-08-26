@@ -25,7 +25,6 @@ check_list_update() {
 	local listname="$4"
 	local lock="$RUN_DIR/update_resources-$listtype.lock"
 	local github_token="$(uci -q get homeproxy.config.github_token)"
-	local wget="wget --timeout=10 -q"
 
 	exec 200>"$lock"
 	if ! flock -n 200 &> "/dev/null"; then
@@ -33,8 +32,9 @@ check_list_update() {
 		return 2
 	fi
 
-	[ -z "$github_token" ] || github_token="--header=Authorization: Bearer $github_token"
-	local list_info="$($wget "${github_token:--q}" -O- "https://api.github.com/repos/$listrepo/commits?sha=$listref&path=$listname&per_page=1")"
+	set -- -fsSL --connect-timeout 10 --max-time 15
+	[ -z "$github_token" ] || set -- "$@" -H "Authorization: Bearer $github_token"
+	local list_info="$(curl "$@" "https://api.github.com/repos/$listrepo/commits?sha=$listref&path=$listname&per_page=1" 2>/dev/null)"
 	local list_sha="$(echo -e "$list_info" | jsonfilter -qe "@[0].sha")"
 	local list_ver="$(echo -e "$list_info" | jsonfilter -qe "@[0].commit.message" | grep -Eo "[0-9-]+" | tr -d '-')"
 	if [ -z "$list_sha" ] || [ -z "$list_ver" ]; then
@@ -51,7 +51,8 @@ check_list_update() {
 		log "[$(to_upper "$listtype")] Local version: $local_list_ver, latest version: $list_ver."
 	fi
 
-	if ! $wget "https://fastly.jsdelivr.net/gh/$listrepo@$list_sha/$listname" -O "$RUN_DIR/$listname" || [ ! -s "$RUN_DIR/$listname" ]; then
+	if ! curl -fsSL --connect-timeout 10 --max-time 60 --retry 2 -o "$RUN_DIR/$listname" \
+		"https://fastly.jsdelivr.net/gh/$listrepo@$list_sha/$listname" || [ ! -s "$RUN_DIR/$listname" ]; then
 		rm -f "$RUN_DIR/$listname"
 		log "[$(to_upper "$listtype")] Update failed."
 		return 1
@@ -69,7 +70,6 @@ check_dashboard_update() {
 	local branch="gh-pages"
 	local lock="$RUN_DIR/update_resources-dashboard.lock"
 	local github_token="$(uci -q get homeproxy.config.github_token)"
-	local wget="wget --timeout=10 -q"
 
 	exec 201>"$lock"
 	if ! flock -n 201 &> "/dev/null"; then
@@ -77,8 +77,9 @@ check_dashboard_update() {
 		return 2
 	fi
 
-	[ -z "$github_token" ] || github_token="--header=Authorization: Bearer $github_token"
-	local commit_info="$($wget "${github_token:--q}" -O- "https://api.github.com/repos/$repo/commits?sha=$branch&per_page=1")"
+	set -- -fsSL --connect-timeout 10 --max-time 15
+	[ -z "$github_token" ] || set -- "$@" -H "Authorization: Bearer $github_token"
+	local commit_info="$(curl "$@" "https://api.github.com/repos/$repo/commits?sha=$branch&per_page=1" 2>/dev/null)"
 	local commit_sha="$(echo -e "$commit_info" | jsonfilter -qe "@[0].sha")"
 	if [ -z "$commit_sha" ]; then
 		log "[DASHBOARD] Failed to get the latest version, please retry later."
@@ -99,7 +100,8 @@ check_dashboard_update() {
 	local tmp_extract="$RUN_DIR/dashboard-extract"
 	rm -rf "$tmp_zip" "$tmp_extract"
 
-	if ! $wget "https://codeload.github.com/$repo/zip/$commit_sha" -O "$tmp_zip" || [ ! -s "$tmp_zip" ]; then
+	if ! curl -fsSL --connect-timeout 10 --max-time 120 --retry 2 -o "$tmp_zip" \
+		"https://codeload.github.com/$repo/zip/$commit_sha" || [ ! -s "$tmp_zip" ]; then
 		rm -f "$tmp_zip"
 		log "[DASHBOARD] Update failed while downloading the dashboard."
 		return 1
