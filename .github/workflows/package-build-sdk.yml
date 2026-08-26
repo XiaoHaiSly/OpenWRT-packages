@@ -113,9 +113,8 @@ jobs:
       - name: Select packages
         working-directory: sdk
         run: |
-          make defconfig
-          make allnoconfig
-          echo "CONFIG_ALL=n" >> .config
+          echo "CONFIG_ALL=n" > .config
+          echo "CONFIG_ALL_KMODS=n" >> .config
           for p in $PACKAGES; do
             echo "CONFIG_PACKAGE_${p}=m" >> .config
           done
