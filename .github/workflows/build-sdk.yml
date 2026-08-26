@@ -1,4 +1,4 @@
-name: package-build-sdk
+name: build-sdk
 
 on:
   workflow_dispatch:
