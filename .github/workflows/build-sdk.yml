@@ -18,6 +18,8 @@ env:
     luci-app-substore
     luci-app-wolultra
     luci-app-adguardhome
+    lucky
+    sing-box
     node
 
 jobs:
