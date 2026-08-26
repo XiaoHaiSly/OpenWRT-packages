@@ -22,7 +22,7 @@ env:
 
 jobs:
   build:
-    name: build ${{ env.ARCH_TAG }} (standard SDK)
+    name: build (standard SDK)
     runs-on: ubuntu-latest
 
     steps:
