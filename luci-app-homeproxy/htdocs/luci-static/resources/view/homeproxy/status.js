@@ -25,6 +25,31 @@ const css = '				\
 
 const hp_dir = '/var/run/homeproxy';
 
+function pollJobStatus(fetchStatus, onTick, intervalMs) {
+	return new Promise((resolve) => {
+		let misses = 0;
+		const tick = () => {
+			L.resolveDefault(fetchStatus(), null).then((st) => {
+				if (!st || !st.state || st.state === 'idle') {
+					if (++misses > 5) {
+						resolve({ state: 'error' });
+						return;
+					}
+					setTimeout(tick, intervalMs);
+					return;
+				}
+				misses = 0;
+				onTick(st);
+				if (st.state === 'running')
+					setTimeout(tick, intervalMs);
+				else
+					resolve(st);
+			});
+		};
+		tick();
+	});
+}
+
 function getConnStat(o, site) {
 	const callConnStat = rpc.declare({
 		object: 'luci.homeproxy',
@@ -62,9 +87,16 @@ function getResVersion(o, type) {
 		expect: { '': {} }
 	});
 
-	const callResUpdate = rpc.declare({
+	const callResUpdateStart = rpc.declare({
 		object: 'luci.homeproxy',
-		method: 'resources_update',
+		method: 'resources_update_start',
+		params: ['type'],
+		expect: { '': {} }
+	});
+
+	const callResUpdateStatus = rpc.declare({
+		object: 'luci.homeproxy',
+		method: 'resources_update_status',
 		params: ['type'],
 		expect: { '': {} }
 	});
@@ -78,34 +110,37 @@ function getResVersion(o, type) {
 		let spanTemp = E('div', { 'style': 'cbi-value-field' }, [
 			E('button', {
 				'class': 'btn cbi-button cbi-button-action',
-				'click': ui.createHandlerFn(this, () => {
-					return L.resolveDefault(callResUpdate(type), {}).then((updRes) => {
-						let msg, color;
-						switch (updRes.status) {
-						case 0:
-							msg = _('Successfully updated.'); color = 'green';
-							break;
-						case 1:
-							msg = _('Update failed.'); color = 'red';
-							break;
-						case 2:
-							msg = _('Already in updating.'); color = 'darkorange';
-							break;
-						case 3:
-							msg = _('Already at the latest version.'); color = 'gray';
-							break;
-						default:
-							msg = _('Unknown error.'); color = 'red';
-							break;
-						}
-						msgEl.textContent = msg;
-						msgEl.style.color = color;
+				'click': ui.createHandlerFn(this, async function() {
+					const start = await L.resolveDefault(callResUpdateStart(type), {});
 
-						return L.resolveDefault(callResVersion(type), {}).then((verRes) => {
-							versionEl.textContent = verRes.error ? 'not found' : verRes.version;
-							versionEl.style.color = verRes.error ? 'red' : 'green';
-						});
-					});
+					const updRes = start.result
+						? await pollJobStatus(() => callResUpdateStatus(type), () => {}, 1500)
+						: {};
+
+					let msg, color;
+					switch (updRes.state) {
+					case 'success':
+						msg = _('Successfully updated.'); color = 'green';
+						break;
+					case 'locked':
+						msg = _('Already in updating.'); color = 'darkorange';
+						break;
+					case 'latest':
+						msg = _('Already at the latest version.'); color = 'gray';
+						break;
+					case 'error':
+						msg = _('Update failed.'); color = 'red';
+						break;
+					default:
+						msg = _('Unknown error.'); color = 'red';
+						break;
+					}
+					msgEl.textContent = msg;
+					msgEl.style.color = color;
+
+					const verRes = await L.resolveDefault(callResVersion(type), {});
+					versionEl.textContent = verRes.error ? 'not found' : verRes.version;
+					versionEl.style.color = verRes.error ? 'red' : 'green';
 				})
 			}, [ _('Check update') ]),
 			' ',
@@ -123,14 +158,11 @@ function callCoreInfo() {
 function callCoreCheckRemote(core, channel) {
 	return rpc.declare({ object: 'luci.homeproxy', method: 'core_check_remote', params: ['core', 'channel'], expect: { '': {} } })(core, channel);
 }
-function callCorePrepare(core, channel) {
-	return rpc.declare({ object: 'luci.homeproxy', method: 'core_prepare_install', params: ['core', 'channel'], expect: { '': {} } })(core, channel);
+function callCoreUpdateStart(channel) {
+	return rpc.declare({ object: 'luci.homeproxy', method: 'core_update_start', params: ['channel'], expect: { '': {} } })(channel);
 }
-function callCoreDownload(url, tmp_path) {
-	return rpc.declare({ object: 'luci.homeproxy', method: 'core_download', params: ['url', 'tmp_path'], expect: { '': {} } })(url, tmp_path);
-}
-function callCoreInstall(core, tmp_path) {
-	return rpc.declare({ object: 'luci.homeproxy', method: 'core_install', params: ['core', 'tmp_path'], expect: { '': {} } })(core, tmp_path);
+function callCoreUpdateStatus() {
+	return rpc.declare({ object: 'luci.homeproxy', method: 'core_update_status', expect: { '': {} } })();
 }
 function callCoreRestore() {
 	return rpc.declare({ object: 'luci.homeproxy', method: 'core_restore', expect: { '': {} } })();
@@ -201,34 +233,27 @@ function buildCoreContext() {
 				remoteEl.textContent = _('Checking requirements...');
 				remoteEl.style.color = 'gray';
 
-				const prep = await L.resolveDefault(callCorePrepare(core, getChannel()), {});
-				if (prep.error) {
-					remoteEl.textContent = prep.error;
-					remoteEl.style.color = 'red';
-					setBusy(false);
-					return;
-				}
+				const start = await L.resolveDefault(callCoreUpdateStart(getChannel()), {});
 
-				remoteEl.textContent = _('Downloading') + ' v' + prep.version + '...';
-				const dl = await L.resolveDefault(callCoreDownload(prep.dl_url, prep.tmp_path), {});
-				if (!dl.result) {
-					remoteEl.textContent = dl.error || _('Download failed');
-					remoteEl.style.color = 'red';
-					setBusy(false);
-					return;
-				}
+				const final = start.result
+					? await pollJobStatus(callCoreUpdateStatus, (st) => {
+						if (st.stage === 'downloading')
+							remoteEl.textContent = _('Downloading') + (st.version ? ' v' + st.version : '') + '...';
+						else if (st.stage === 'installing')
+							remoteEl.textContent = _('Installing (service will restart)...');
+						else
+							remoteEl.textContent = _('Checking requirements...');
+						remoteEl.style.color = 'gray';
+					}, 1500)
+					: {};
 
-				remoteEl.textContent = _('Installing (service will restart)...');
-				const inst = await L.resolveDefault(callCoreInstall(core, prep.tmp_path), {});
-				if (!inst.result) {
-					remoteEl.textContent = inst.error || _('Installation failed');
+				if (final.state === 'success') {
+					remoteEl.textContent = _('Updated successfully');
+					remoteEl.style.color = 'green';
+				} else {
+					remoteEl.textContent = final.message || _('Update failed.');
 					remoteEl.style.color = 'red';
-					setBusy(false);
-					return;
 				}
-
-				remoteEl.textContent = _('Updated successfully');
-				remoteEl.style.color = 'green';
 				await refreshStatus();
 				setBusy(false);
 			})

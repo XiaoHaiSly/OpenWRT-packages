@@ -14,6 +14,36 @@ function hasKernelModule(kmod) {
 
 const HP_DIR = '/etc/homeproxy';
 const RUN_DIR = '/var/run/homeproxy';
+const JOBS_DIR = `${RUN_DIR}/jobs`;
+
+function job_esc(s) {
+	return replace(replace('' + (s ?? ''), '\\', '\\\\'), '"', '\\"');
+}
+
+function job_write(name, state, stage, message, version) {
+	system(`mkdir -p ${shellquote(JOBS_DIR)}`);
+
+	let fields = [ `"ts":"${time()}"`, `"state":"${job_esc(state)}"`, `"stage":"${job_esc(stage)}"` ];
+	if (message) push(fields, `"message":"${job_esc(message)}"`);
+	if (version) push(fields, `"version":"${job_esc(version)}"`);
+
+	const path = `${JOBS_DIR}/${name}.json`;
+	writefile(`${path}.tmp`, '{' + join(',', fields) + '}');
+	system(`mv -f ${shellquote(path + '.tmp')} ${shellquote(path)}`);
+}
+
+function job_read(name) {
+	const raw = readfile(`${JOBS_DIR}/${name}.json`);
+	if (!raw)
+		return { state: 'idle' };
+
+	try {
+		const parsed = json(raw);
+		return (type(parsed) === 'object') ? parsed : { state: 'idle' };
+	} catch (e) {
+		return { state: 'idle' };
+	}
+}
 
 function core_cache_paths() {
 	let paths = [
@@ -33,7 +63,6 @@ function core_cache_paths() {
 
 	return paths;
 }
-
 
 const SINGBOX_BIN      = '/usr/bin/sing-box';
 const CORE_BACKUP_DIR   = `${HP_DIR}/core-backup`;
@@ -372,109 +401,21 @@ const methods = {
 		}
 	},
 
-	core_prepare_install: {
-		args: { core: 'core', channel: 'channel' },
+	core_update_start: {
+		args: { channel: 'channel' },
 		call: function(req) {
-			const core = req.args?.core;
 			const channel = (req.args?.channel === 'stable') ? 'stable' : 'latest';
-			if (core !== 'official')
-				return { error: 'illegal core' };
 
-			const arch = core_detect_arch();
-			if (!arch)
-				return { error: 'could not detect device architecture' };
+			job_write('core_official', 'running', 'preparing');
+			system(`/usr/bin/ucode -S ${HP_DIR}/scripts/update_core.uc ${shellquote(channel)} >/dev/null 2>&1 &`);
 
-			const goarch = core_goarch(arch);
-			if (!goarch)
-				return { error: `no Go-arch mapping for OpenWrt arch "${arch}" — add one to CORE_GOARCH_MAP in this file` };
-
-			const data = core_fetch_release(core_repo(core), channel);
-			if (!data?.assets)
-				return { error: 'could not read release info from GitHub' };
-
-			const version = replace(data.tag_name, /^v/, '');
-
-			let candidates = [];
-			for (let asset in data.assets) {
-				const n = asset?.name || '';
-				if (!match(n, /linux/i)) continue;
-				if (match(n, /openwrt|alpine|\.apk$|\.deb$|\.rpm$/i)) continue;
-				if (!match(n, /\.(tar\.gz|tgz)$/i)) continue;
-				if (!core_arch_matches(n, goarch)) continue;
-				push(candidates, asset);
-			}
-			let chosen = null;
-			for (let a in candidates)
-				if (match(a?.name, /musl/i)) { chosen = a; break; }
-			if (!chosen) chosen = candidates[0];
-
-			if (!chosen)
-				return { error: `no linux/${goarch} tarball found in the latest ${core} release` };
-
-			return {
-				arch, version,
-				dl_url: chosen.browser_download_url,
-				tmp_path: `/tmp/sing-box-${core}.tar.gz`
-			};
+			return { result: true };
 		}
 	},
 
-	core_download: {
-		args: { url: 'url', tmp_path: 'tmp_path' },
-		call: function(req) {
-			const url = req.args?.url, tmp_path = req.args?.tmp_path;
-			if (!url || !tmp_path)
-				return { result: false, error: 'missing arguments' };
-
-			const max_tries = 3;
-			let exit_code = 1;
-			for (let attempt = 1; attempt <= max_tries; attempt++) {
-				exit_code = system(`/usr/bin/curl -4 -fsSL -o ${shellquote(tmp_path)} -C - --connect-timeout 10 --max-time 30 ${shellquote(url)} 2>/dev/null`, 300000);
-				if (exit_code === 0) break;
-			}
-			return exit_code === 0 ? { result: true } : { result: false, error: 'download failed' };
-		}
-	},
-
-	core_install: {
-		args: { core: 'core', tmp_path: 'tmp_path' },
-		call: function(req) {
-			const core = req.args?.core;
-			const tmp_path = req.args?.tmp_path;
-			if (core !== 'official' || !tmp_path)
-				return { result: false, error: 'invalid arguments' };
-
-			if (!access(CORE_BACKUP_BIN) && access(SINGBOX_BIN)) {
-				system(`mkdir -p ${CORE_BACKUP_DIR}`);
-				system(`cp -f ${SINGBOX_BIN} ${CORE_BACKUP_BIN}`);
-			}
-
-			let ok = false;
-
-			system('/etc/init.d/homeproxy stop >/dev/null 2>&1');
-
-			const extract_dir = '/tmp/singbox-core-extract';
-			system(`rm -rf ${extract_dir}; mkdir -p ${extract_dir}`);
-			const untar = system(`tar -xzf ${shellquote(tmp_path)} -C ${extract_dir} 2>/dev/null`, 60000);
-
-			let bin_path = null;
-			if (untar === 0) {
-				const fd = popen(`find ${extract_dir} -type f -name 'sing-box*' ! -name '*.txt' 2>/dev/null | head -n1`);
-				if (fd) { bin_path = trim(fd.read('all')); fd.close(); }
-			}
-
-			if (bin_path && length(bin_path) && access(bin_path)) {
-				system(`cp -f ${shellquote(bin_path)} ${SINGBOX_BIN} && chmod 755 ${SINGBOX_BIN}`);
-				ok = true;
-
-				for (let p in core_cache_paths())
-					system(`rm -f ${shellquote(p)} 2>/dev/null`);
-			}
-
-			system(`rm -rf ${extract_dir} ${shellquote(tmp_path)}`);
-			system('/etc/init.d/homeproxy start >/dev/null 2>&1');
-
-			return ok ? { result: true } : { result: false, error: 'installation failed' };
+	core_update_status: {
+		call: function() {
+			return job_read('core_official');
 		}
 	},
 
@@ -504,15 +445,28 @@ const methods = {
 			return length(version) ? { version: version } : { error: 'not found' };
 		}
 	},
-	resources_update: {
+	resources_update_start: {
 		args: { type: 'type' },
 		call: function(req) {
-			if (req.args?.type) {
-				const type = shellquote(req.args?.type);
-				const exit_code = system(`${HP_DIR}/scripts/update_resources.sh ${type}`);
-				return { status: exit_code };
-			} else
-				return { status: 255, error: 'illegal type' };
+			const type = req.args?.type;
+			if (index(['china_ip4', 'china_ip6', 'china_list', 'gfw_list', 'dashboard'], type) === -1)
+				return { result: false, error: 'illegal type' };
+
+			job_write(`res_${type}`, 'running', 'checking');
+			system(`${HP_DIR}/scripts/update_resources.sh ${shellquote(type)} >/dev/null 2>&1 &`);
+
+			return { result: true };
+		}
+	},
+
+	resources_update_status: {
+		args: { type: 'type' },
+		call: function(req) {
+			const type = req.args?.type;
+			if (index(['china_ip4', 'china_ip6', 'china_list', 'gfw_list', 'dashboard'], type) === -1)
+				return { state: 'idle' };
+
+			return job_read(`res_${type}`);
 		}
 	},
 
