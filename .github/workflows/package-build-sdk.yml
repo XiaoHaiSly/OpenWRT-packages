@@ -103,10 +103,10 @@ jobs:
           restore-keys: |
             dl-${{ matrix.arch_tag }}-
 
-      - name: Setup custom feed
-        working-directory: sdk
+      - name: Add custom packages
         run: |
-          echo "src-link packages_ci $GITHUB_WORKSPACE" >> feeds.conf.default
+          ln -s "$GITHUB_WORKSPACE" sdk/package/packages_ci
+          cd sdk
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
@@ -131,8 +131,10 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p out
-          find sdk/bin/packages -name "*.ipk" -exec cp {} out/ \; || true
-          find sdk/bin/packages -name "*.apk" -exec cp {} out/ \; || true
+          for p in $PACKAGES; do
+            find sdk/bin/packages -iname "${p}_*.ipk" -exec cp {} out/ \; 2>/dev/null || true
+            find sdk/bin/packages -iname "${p}-*.apk" -exec cp {} out/ \; 2>/dev/null || true
+          done
           ls -la out/
 
       - name: Store packages
