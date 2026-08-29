@@ -76,6 +76,60 @@ return baseclass.extend({
 		}
 	}),
 
+	reconcileUrltestNodes(uciconfig) {
+		const available = Object.create(null);
+		let firstNode = null;
+		let changed = false;
+
+		uci.sections(uciconfig, 'node', (section) => {
+			available[section['.name']] = true;
+			firstNode ??= section['.name'];
+		});
+
+		function reconcileList(option) {
+			const current = uci.get(uciconfig, 'config', option);
+			const normalized = Array.isArray(current) ? current : (current ? [ current ] : []);
+			const seen = Object.create(null);
+			const filtered = normalized.filter((node) => {
+				if (!node || seen[node] || !available[node])
+					return false;
+				seen[node] = true;
+				return true;
+			});
+
+			if (JSON.stringify(normalized) !== JSON.stringify(filtered)) {
+				uci.set(uciconfig, 'config', option, filtered.length ? filtered : null);
+				changed = true;
+			}
+
+			return filtered;
+		}
+
+		const mainNodes = reconcileList('main_urltest_nodes');
+		const mainNode = uci.get(uciconfig, 'config', 'main_node');
+		if (mainNode === 'urltest' && !mainNodes.length) {
+			uci.set(uciconfig, 'config', 'main_node', firstNode || 'nil');
+			changed = true;
+		}
+		else if (mainNode && mainNode !== 'nil' && mainNode !== 'urltest' && mainNode !== 'core_only' && !available[mainNode]) {
+			uci.set(uciconfig, 'config', 'main_node', firstNode || 'nil');
+			changed = true;
+		}
+
+		const mainUdpNodes = reconcileList('main_udp_urltest_nodes');
+		const mainUdpNode = uci.get(uciconfig, 'config', 'main_udp_node');
+		if (mainUdpNode === 'urltest' && !mainUdpNodes.length) {
+			uci.set(uciconfig, 'config', 'main_udp_node', 'same');
+			changed = true;
+		}
+		else if (mainUdpNode && mainUdpNode !== 'nil' && mainUdpNode !== 'same' && mainUdpNode !== 'urltest' && !available[mainUdpNode]) {
+			uci.set(uciconfig, 'config', 'main_udp_node', 'same');
+			changed = true;
+		}
+
+		return changed;
+	},
+
 	calcStringMD5(e) {
 		let h = (a, b) => {
 			let c, d, e, f, g;

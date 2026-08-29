@@ -101,6 +101,142 @@ export function isEmpty(res) {
 	return !res || res === 'nil' || (type(res) in ['array', 'object'] && length(res) === 0);
 };
 
+export function normalizeList(value) {
+	if (isEmpty(value))
+		return [];
+	return (type(value) === 'array') ? value : [value];
+};
+
+export function createNodeLabelRegistry() {
+	return {
+		'direct-out': true,
+		'block-out': true,
+		'main-out': true,
+		'main-udp-out': true
+	};
+};
+
+export function reserveUniqueLabel(used, label, fallback) {
+	let base = trim(label || '') || fallback;
+	let candidate = base;
+	let suffix = 2;
+
+	while (used[candidate])
+		candidate = `${base} (${suffix++})`;
+	used[candidate] = true;
+
+	return candidate;
+};
+
+export function synchronizeNodeLabels(uci, config, include) {
+	const used = {};
+	let changed = 0;
+
+	uci.foreach(config, 'node', (section) => {
+		if (type(include) === 'function' && !include(section)) {
+			used[trim(section.label || '') || section['.name']] = true;
+			return;
+		}
+
+		const label = reserveUniqueLabel(used, section.label, section['.name']);
+		if (section.label !== label) {
+			uci.set(config, section['.name'], 'label', label);
+			changed++;
+		}
+	});
+
+	return { changed, used };
+};
+
+export function filterExistingNodes(uci, config, value, onRemove) {
+	let nodes = normalizeList(value);
+	let result = [], seen = {};
+
+	for (let node in nodes) {
+		if (isEmpty(node) || seen[node])
+			continue;
+		seen[node] = true;
+
+		if (uci.get(config, node) !== 'node') {
+			if (type(onRemove) === 'function')
+				onRemove(node);
+			continue;
+		}
+
+		push(result, node);
+	}
+
+	return result;
+};
+
+export function reconcileUrltestNodes(uci, config, logger) {
+	let changed = false, removed = 0;
+
+	function log(message) {
+		if (type(logger) === 'function')
+			logger(message);
+	};
+
+	function reconcileList(section, option) {
+		const current = uci.get(config, section, option);
+		const normalized = normalizeList(current);
+		const available = filterExistingNodes(uci, config, normalized, (node) => {
+			removed++;
+			log(sprintf('Node %s is gone, removing it from %s.%s.', node, section, option));
+		});
+
+		if (sprintf('%J', normalized) !== sprintf('%J', available)) {
+			if (length(available))
+				uci.set(config, section, option, available);
+			else
+				uci.delete(config, section, option);
+			changed = true;
+		}
+
+		return available;
+	};
+
+	function fallbackFirstNode() {
+		return uci.get_first(config, 'node') || 'nil';
+	};
+
+	const main_node = uci.get(config, 'config', 'main_node') || 'nil';
+	if (main_node === 'urltest') {
+		const mainNodes = reconcileList('config', 'main_urltest_nodes');
+		if (!length(mainNodes)) {
+			const fallback = fallbackFirstNode();
+			uci.set(config, 'config', 'main_node', fallback);
+			changed = true;
+			log((fallback === 'nil') ?
+				'Main URLTest group is empty; disabling the client.' :
+				sprintf('Main URLTest group is empty; switching main node to %s.', fallback));
+		}
+	} else if (main_node !== 'nil' && main_node !== 'core_only' && uci.get(config, main_node) !== 'node') {
+		const fallback = fallbackFirstNode();
+		uci.set(config, 'config', 'main_node', fallback);
+		changed = true;
+		log((fallback === 'nil') ?
+			'Main node is gone; disabling the client.' :
+			sprintf('Main node is gone; switching main node to %s.', fallback));
+	}
+
+	const main_udp_node = uci.get(config, 'config', 'main_udp_node') || 'nil';
+	if (main_udp_node === 'urltest') {
+		const mainUdpNodes = reconcileList('config', 'main_udp_urltest_nodes');
+		if (!length(mainUdpNodes)) {
+			uci.set(config, 'config', 'main_udp_node', 'same');
+			changed = true;
+			log('Main UDP URLTest group is empty; falling back to using the main node for UDP.');
+		}
+	} else if (main_udp_node !== 'nil' && main_udp_node !== 'same' && uci.get(config, main_udp_node) !== 'node') {
+		uci.set(config, 'config', 'main_udp_node', 'same');
+		changed = true;
+		log('Main UDP node is gone; falling back to using the main node for UDP.');
+	}
+
+	return { changed, removed };
+};
+
 export function strToBool(str) {
 	return (str === '1') || null;
 };

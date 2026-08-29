@@ -90,15 +90,6 @@ start_service() {
 
 	mkdir -p "$RUN_DIR" "$CUSTOM_DIR"
 
-	local auto_restart auto_restart_cron
-	config_get_bool auto_restart "config" "auto_restart" "0"
-	if [ "$auto_restart" = "1" ]; then
-		config_get auto_restart_cron "config" "auto_restart_cron" "0 2 * * *"
-		sync_cron_tag "${CONF}_restart_autosetup" "$auto_restart_cron /etc/init.d/homeproxy restart #${CONF}_restart_autosetup"
-	else
-		sync_cron_tag "${CONF}_restart_autosetup" ""
-	fi
-
 	local has_core_sub=0
 	check_core_sub_url() {
 		local cfg="$1" url enabled
@@ -429,7 +420,6 @@ start_service() {
 
 stop_service() {
 	sync_cron_tag "${CONF}_autosetup" ""
-	sync_cron_tag "${CONF}_restart_autosetup" ""
 	sync_cron_tag "${CONF}_core_sub_autosetup" ""
 
 	config_load "$CONF"

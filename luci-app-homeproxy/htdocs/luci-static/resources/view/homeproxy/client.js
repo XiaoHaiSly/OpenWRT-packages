@@ -35,6 +35,12 @@ const callWriteDomainList = rpc.declare({
 	expect: { '': {} }
 });
 
+const callCurrentNode = rpc.declare({
+	object: 'luci.homeproxy',
+	method: 'current_node_get',
+	expect: { '': {} }
+});
+
 function getServiceStatus() {
 	return L.resolveDefault(callServiceList('homeproxy'), {}).then((res) => {
 		let isRunning = false;
@@ -45,13 +51,19 @@ function getServiceStatus() {
 	});
 }
 
-function renderStatus(isRunning, version) {
+function renderStatus(isRunning, version, currentNodeLabel, currentUdpNodeLabel) {
 	let spanTemp = '<em><span style="color:%s"><strong>%s (sing-box v%s) %s</strong></span></em>';
 	let renderHTML;
 	if (isRunning)
 		renderHTML = spanTemp.format('green', _('HomeProxy'), version, _('RUNNING'));
 	else
 		renderHTML = spanTemp.format('red', _('HomeProxy'), version, _('NOT RUNNING'));
+
+	if (isRunning && currentNodeLabel)
+		renderHTML += '<div><em><span style="color:%s"><strong>%s</strong></span></em></div>'.format('#1e90ff', '%h'.format(currentNodeLabel));
+
+	if (isRunning && currentUdpNodeLabel)
+		renderHTML += '<div><em><span style="color:%s"><strong>%s</strong></span></em></div>'.format('#1e90ff', '%h'.format(currentUdpNodeLabel));
 
 	return renderHTML;
 }
@@ -245,11 +257,33 @@ return view.extend({
 		});
 
 		function refreshStatus() {
-			return L.resolveDefault(getServiceStatus()).then((res) => {
-				let view = document.getElementById('service_status');
-				if (view) view.innerHTML = renderStatus(res, features.version);
+			return Promise.all([
+				L.resolveDefault(getServiceStatus(), false),
+				L.resolveDefault(callCurrentNode(), null)
+			]).then((res) => {
+				let isRunning = res[0],
+				    current = res[1],
+				    currentNodeLabel = null,
+				    currentUdpNodeLabel = null;
 
-				return res;
+				if (current?.mode === 'urltest') {
+					let active = current.active || {};
+					let nodeName = (active?.id && active.id !== 'urltest') ?
+						(proxy_nodes[active.id] || active.label || active.id) : _('Invalid node');
+					currentNodeLabel = _('URLTest: %s').format(nodeName);
+				}
+
+				if (current?.udp_mode === 'urltest') {
+					let udpActive = current.udp_active || {};
+					let udpNodeName = (udpActive?.id && udpActive.id !== 'urltest') ?
+						(proxy_nodes[udpActive.id] || udpActive.label || udpActive.id) : _('Invalid node');
+					currentUdpNodeLabel = _('UDP URLTest: %s').format(udpNodeName);
+				}
+
+				let view = document.getElementById('service_status');
+				if (view) view.innerHTML = renderStatus(isRunning, features.version, currentNodeLabel, currentUdpNodeLabel);
+
+				return isRunning;
 			});
 		}
 
@@ -306,7 +340,7 @@ return view.extend({
 		o.depends('main_node', 'urltest');
 
 		o = s.taboption('routing', form.Flag, 'main_urltest_interrupt_exist_connections', _('Interrupt existing connections'));
-		o.default = o.disabled;
+		o.default = o.enabled;
 		o.rmempty = false;
 		o.depends('main_node', 'urltest');
 
@@ -373,7 +407,7 @@ return view.extend({
 		o.depends({'main_udp_node': 'urltest', 'main_node': /^((?!core_only).)+$/});
 
 		o = s.taboption('routing', form.Flag, 'main_udp_urltest_interrupt_exist_connections', _('Interrupt existing connections'));
-		o.default = o.disabled;
+		o.default = o.enabled;
 		o.rmempty = false;
 		o.depends({'main_udp_node': 'urltest', 'main_node': /^((?!core_only).)+$/});
 
@@ -530,23 +564,6 @@ return view.extend({
 		o.default = o.disabled;
 		o.rmempty = false;
 		o.depends({'main_node': /^((?!core_only).)+$/});
-
-		o = s.taboption('routing', form.Flag, 'auto_restart', _('Auto Restart'),
-			_('Periodically restart the HomeProxy service.'));
-		o.default = '0';
-		o.rmempty = false;
-
-		o = s.taboption('routing', form.Value, 'auto_restart_cron', _('Restart schedule'),
-			_('Standard 5-field cron expression, e.g. <code>0 2 * * *</code> for every day at 2:00.'));
-		o.default = '0 2 * * *';
-		o.placeholder = '0 2 * * *';
-		o.depends('auto_restart', '1');
-		o.rmempty = false;
-		o.validate = function(section_id, value) {
-			if (value && value.trim().split(/\s+/).length !== 5)
-				return _('Expecting: a 5-field cron expression, e.g. %s').format('"0 2 * * *"');
-			return true;
-		};
 
 		o = s.taboption('dashboard', form.Value, 'dashboard_port', _('Listen port'));
 		o.default = '9096';

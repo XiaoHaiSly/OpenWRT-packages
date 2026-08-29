@@ -7,7 +7,8 @@ import { connect } from 'ubus';
 import { cursor } from 'uci';
 
 import {
-	isEmpty, parseURL, strToBool, strToInt, strToTime,
+	createNodeLabelRegistry, isEmpty, parseURL, reserveUniqueLabel,
+	strToBool, strToInt, strToTime,
 	removeBlankAttrs, validation, HP_DIR, RUN_DIR
 } from 'homeproxy';
 
@@ -24,6 +25,25 @@ const uciinfra = 'infra',
       ucicontrol = 'control';
 
 const ucinode = 'node';
+
+const outbound_tags = createNodeLabelRegistry();
+const node_outbound_tags = {};
+uci.foreach(uciconfig, ucinode, (cfg) => {
+	let label = trim(cfg.label ?? '');
+	if (!isEmpty(label))
+		label = replace(label, /[\r\n\t]+/g, ' ');
+
+	node_outbound_tags[cfg['.name']] = reserveUniqueLabel(
+		outbound_tags,
+		label,
+		`cfg-${cfg['.name']}-out`
+	);
+});
+
+function node_out_tag(id) {
+	return node_outbound_tags[id] || `cfg-${id}-out`;
+}
+
 
 const routing_mode = uci.get(uciconfig, ucimain, 'routing_mode') || 'bypass_mainland_china';
 
@@ -133,7 +153,7 @@ function generate_endpoint(node) {
 
 	const endpoint = {
 		type: node.type,
-		tag: 'cfg-' + node['.name'] + '-out',
+		tag: node_out_tag(node['.name']),
 		address: node.wireguard_local_address,
 		mtu: strToInt(node.wireguard_mtu),
 		private_key: node.wireguard_private_key,
@@ -166,7 +186,7 @@ function generate_outbound(node) {
 
 	const outbound = {
 		type: node.type,
-		tag: 'cfg-' + node['.name'] + '-out',
+		tag: node_out_tag(node['.name']),
 		routing_mark: strToInt(self_mark),
 
 		server: node.address,
@@ -478,7 +498,7 @@ if (!isEmpty(main_node)) {
 		push(config.outbounds, {
 			type: 'urltest',
 			tag: 'main-out',
-			outbounds: map(main_urltest_nodes, (k) => `cfg-${k}-out`),
+			outbounds: map(main_urltest_nodes, (k) => node_out_tag(k)),
 			interval: strToTime(main_urltest_interval),
 			tolerance: strToInt(main_urltest_tolerance),
 			idle_timeout: (strToInt(main_urltest_interval) > 1800) ? `${main_urltest_interval * 2}s` : null,
@@ -505,7 +525,7 @@ if (!isEmpty(main_node)) {
 		push(config.outbounds, {
 			type: 'urltest',
 			tag: 'main-udp-out',
-			outbounds: map(main_udp_urltest_nodes, (k) => `cfg-${k}-out`),
+			outbounds: map(main_udp_urltest_nodes, (k) => node_out_tag(k)),
 			interval: strToTime(main_udp_urltest_interval),
 			tolerance: strToInt(main_udp_urltest_tolerance),
 			idle_timeout: (strToInt(main_udp_urltest_interval) > 1800) ? `${main_udp_urltest_interval * 2}s` : null,
@@ -527,10 +547,10 @@ if (!isEmpty(main_node)) {
 		const urltest_node = uci.get_all(uciconfig, i) || {};
 		if (urltest_node.type === 'wireguard') {
 			push(config.endpoints, generate_endpoint(urltest_node));
-			config.endpoints[length(config.endpoints)-1].tag = 'cfg-' + i + '-out';
+			config.endpoints[length(config.endpoints)-1].tag = node_out_tag(i);
 		} else {
 			push(config.outbounds, generate_outbound(urltest_node));
-			config.outbounds[length(config.outbounds)-1].tag = 'cfg-' + i + '-out';
+			config.outbounds[length(config.outbounds)-1].tag = node_out_tag(i);
 		}
 	}
 }
@@ -576,7 +596,7 @@ if (!isEmpty(main_node)) {
 			outbound: 'direct-out'
 		});
 
-	if (dedicated_udp_node)
+	if (main_udp_node === 'urltest' || dedicated_udp_node)
 		push(config.route.rules, {
 			network: 'udp',
 			action: 'route',
@@ -612,19 +632,19 @@ if (!isEmpty(main_node)) {
 			type: 'remote',
 			tag: 'geoip-cn',
 			format: 'binary',
-			url: 'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs'
+			url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/cn.srs'
 		});
 		push(config.route.rule_set, {
 			type: 'remote',
 			tag: 'geosite-cn',
 			format: 'binary',
-			url: 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs'
+			url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs'
 		});
 		push(config.route.rule_set, {
 			type: 'remote',
 			tag: 'geosite-noncn',
 			format: 'binary',
-			url: 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs'
+			url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/geolocation-!cn.srs'
 		});
 	}
 }
@@ -639,6 +659,14 @@ if (routing_mode === 'bypass_mainland_china') {
 			path: HP_DIR + '/cache/cache.db',
 			store_dns: true
 		}
+	};
+}
+
+if (main_node === 'urltest' || main_udp_node === 'urltest') {
+	if (!config.experimental)
+		config.experimental = {};
+	config.experimental.clash_api = {
+		external_controller: `127.0.0.1:${dashboard_port + 1}`
 	};
 }
 

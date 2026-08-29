@@ -1315,8 +1315,8 @@ msgstr ""
 msgid "Loading"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1335
-msgid "Local"
+#: htdocs/luci-static/resources/view/homeproxy/node.js:1592
+msgid "Default"
 msgstr ""
 
 #: htdocs/luci-static/resources/view/homeproxy/node.js:896
@@ -1985,7 +1985,7 @@ msgstr ""
 msgid "Reject"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1336
+#: htdocs/luci-static/resources/view/homeproxy/node.js:1593
 msgid "Remote"
 msgstr ""
 
@@ -3145,7 +3145,7 @@ msgstr ""
 msgid "User Agent"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/homeproxy/node.js:1533
+#: htdocs/luci-static/resources/view/homeproxy/node.js:1588
 msgid "Prefer"
 msgstr ""
 

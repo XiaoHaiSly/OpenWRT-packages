@@ -1221,6 +1221,12 @@ return view.extend({
 		}
 
 		m = new form.Map('homeproxy', _('Edit nodes'));
+		const saveMap = m.save;
+		m.save = function(cb, silent) {
+			return saveMap.call(this, () => Promise.resolve(
+				typeof cb === 'function' ? cb() : null
+			).then(() => hp.reconcileUrltestNodes(data[0])), silent);
+		};
 
 		s = m.section(form.NamedSection, 'subscription', 'homeproxy');
 
@@ -1448,11 +1454,26 @@ return view.extend({
 			for (let i in subnodes)
 				uci.remove(data[0], subnodes[i]);
 
-			if (subnodes.includes(uci.get(data[0], 'config', 'main_node')))
+			const scrubUrltestList = (option) => {
+				let list = uci.get(data[0], 'config', option);
+				if (!list)
+					return;
+				list = (Array.isArray(list) ? list : [list]).filter((id) => !subnodes.includes(id));
+				uci.set(data[0], 'config', option, list.length ? list : null);
+				return list;
+			};
+			const remainingUrltestNodes = scrubUrltestList('main_urltest_nodes');
+			const remainingUdpUrltestNodes = scrubUrltestList('main_udp_urltest_nodes');
+
+			const mainNode = uci.get(data[0], 'config', 'main_node');
+			if (subnodes.includes(mainNode) ||
+			    (mainNode === 'urltest' && (!remainingUrltestNodes || !remainingUrltestNodes.length)))
 				uci.set(data[0], 'config', 'main_node', 'nil');
 
-			if (subnodes.includes(uci.get(data[0], 'config', 'main_udp_node')))
-				uci.set(data[0], 'config', 'main_udp_node', 'nil');
+			const mainUdpNode = uci.get(data[0], 'config', 'main_udp_node');
+			if (subnodes.includes(mainUdpNode) ||
+			    (mainUdpNode === 'urltest' && (!remainingUdpUrltestNodes || !remainingUdpUrltestNodes.length)))
+				uci.set(data[0], 'config', 'main_udp_node', 'same');
 
 			this.inputtitle = _('%s nodes removed').format(subnodes.length);
 			this.readonly = true;
@@ -1583,7 +1604,7 @@ return view.extend({
 		so.default = 'local';
 		so.rmempty = false;
 		so.modalonly = true;
-		so.value('local', _('Local'));
+		so.value('local', _('Default'));
 		so.value('remote', _('Remote'));
 
 		s.tab('core_config_editor', _('Core Config Editor'));

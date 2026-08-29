@@ -11,7 +11,8 @@ import { urldecode, urlencode } from 'luci.http';
 
 import {
 	curlGET, decodeBase64Str, getTime, isEmpty, parseURL,
-	validation, HP_DIR, RUN_DIR
+	validation, HP_DIR, RUN_DIR,
+	reconcileUrltestNodes, synchronizeNodeLabels
 } from 'homeproxy';
 
 const uci = cursor();
@@ -30,10 +31,6 @@ const allow_insecure = uci.get(uciconfig, ucisubscription, 'allow_insecure') || 
       subscription_urls = uci.get(uciconfig, ucisubscription, 'subscription_url') || [],
       user_agent = uci.get(uciconfig, ucisubscription, 'user_agent'),
       via_proxy = uci.get(uciconfig, ucisubscription, 'update_via_proxy') || '0';
-
-const main_node_setting = uci.get(uciconfig, ucimain, 'main_node') || 'nil';
-const main_node = main_node_setting,
-      main_udp_node = uci.get(uciconfig, ucimain, 'main_udp_node') || 'nil';
 
 function filter_check(name) {
 	if (isEmpty(name) || filter_mode === 'disabled' || isEmpty(filter_keywords))
@@ -1056,10 +1053,12 @@ function main() {
 			const confHash = md5(sprintf('%J', config)),
 			      nameHash = md5(label);
 			config.label = label;
+			const idHash = md5(confHash + nameHash);
+			config.confhash = idHash;
 
 			if (filter_check(config.label))
 				log(sprintf('Skipping blacklist node: %s.', config.label));
-			else if (node_cache[groupHash][confHash] && node_cache[groupHash][nameHash])
+			else if (node_cache[groupHash][idHash])
 				log(sprintf('Skipping duplicate node: %s.', config.label));
 			else {
 				if (config.tls === '1' && allow_insecure === '1')
@@ -1070,8 +1069,7 @@ function main() {
 				config.grouphash = groupHash;
 				push(node_result, []);
 				push(node_result[length(node_result)-1], config);
-				node_cache[groupHash][confHash] = config;
-				node_cache[groupHash][nameHash] = config;
+				node_cache[groupHash][idHash] = config;
 
 				count++;
 			}
@@ -1122,66 +1120,28 @@ function main() {
 			if (node.isExisting)
 				return null;
 
-			const nameHash = md5(node.label);
-			uci.set(uciconfig, nameHash, 'node');
-			map(keys(node), (v) => uci.set(uciconfig, nameHash, v, node[v]));
+			const nodeId = node.confhash;
+			delete node.confhash;
+
+			uci.set(uciconfig, nodeId, 'node');
+			map(keys(node), (v) => uci.set(uciconfig, nodeId, v, node[v]));
 
 			added++;
 			log(sprintf('Adding node: %s.', node.label));
 		});
+
+	const label_state = synchronizeNodeLabels(uci, uciconfig, null);
+	if (label_state.changed)
+		log(sprintf('Renamed %s duplicate node label(s) to keep them unique.', label_state.changed));
+
 	uci.commit(uciconfig);
 
 	let need_restart = (via_proxy !== '1');
-	if (!isEmpty(main_node) && main_node !== 'core_only') {
-		const first_server = uci.get_first(uciconfig, ucinode);
-		if (first_server) {
-			let main_urltest_nodes;
-			if (main_node === 'urltest') {
-				main_urltest_nodes = filter(uci.get(uciconfig, ucimain, 'main_urltest_nodes'), (v) => {
-					if (!uci.get(uciconfig, v)) {
-						log(sprintf('Node %s is gone, removing from urltest list.', v));
-						return false;
-					}
-					return true;
-				});
-			}
 
-			if ((main_node === 'urltest') ? !length(main_urltest_nodes) : !uci.get(uciconfig, main_node)) {
-				uci.set(uciconfig, ucimain, 'main_node', first_server);
-				uci.commit(uciconfig);
-				need_restart = true;
-
-				log('Main node is gone, switching to the first node.');
-			}
-
-			if (!isEmpty(main_udp_node) && main_udp_node !== 'same') {
-				let main_udp_urltest_nodes;
-				if (main_udp_node === 'urltest') {
-					main_udp_urltest_nodes = filter(uci.get(uciconfig, ucimain, 'main_udp_urltest_nodes'), (v) => {
-						if (!uci.get(uciconfig, v)) {
-							log(sprintf('Node %s is gone, removing from urltest list.', v));
-							return false;
-						}
-						return true;
-					});
-				}
-
-				if ((main_udp_node === 'urltest') ? !length(main_udp_urltest_nodes) : !uci.get(uciconfig, main_udp_node)) {
-					uci.set(uciconfig, ucimain, 'main_udp_node', first_server);
-					uci.commit(uciconfig);
-					need_restart = true;
-
-					log('Main UDP node is gone, switching to the first node.');
-				}
-			}
-		} else {
-			uci.set(uciconfig, ucimain, 'main_node', 'nil');
-			uci.set(uciconfig, ucimain, 'main_udp_node', 'nil');
-			uci.commit(uciconfig);
-			need_restart = true;
-
-			log('No available node, disable tproxy.');
-		}
+	const urltest_result = reconcileUrltestNodes(uci, uciconfig, (message) => log(message));
+	if (urltest_result.changed) {
+		uci.commit(uciconfig);
+		need_restart = true;
 	}
 
 	if (need_restart) {

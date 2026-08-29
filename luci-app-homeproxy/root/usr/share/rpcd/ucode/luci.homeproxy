@@ -3,6 +3,7 @@
 'use strict';
 
 import { access, error, lstat, popen, readfile, writefile } from 'fs';
+import { cursor } from 'uci';
 
 function shellquote(s) {
 	return `'${replace(s, "'", "'\\''")}'`;
@@ -256,7 +257,7 @@ const methods = {
 				url = 'http://connect.rom.miui.com/generate_204';
 				break;
 			case 'google':
-				url = 'https://www.google.com/generate_204';
+				url = 'http://www.google.com/generate_204';
 				break;
 			default:
 				return { result: false, error: 'illegal site' };
@@ -354,6 +355,108 @@ const methods = {
 			features.hp_has_tun = hasKernelModule('tun.ko') || access('/etc/modules.d/30-tun');
 
 			return features;
+		}
+	},
+
+	current_node_get: {
+		call: function() {
+			const uci = cursor();
+			uci.load('homeproxy');
+
+			const formatNode = (section_id, fallback_label) => {
+				if (!section_id || section_id in ['nil', 'same'])
+					return { id: section_id, label: fallback_label || section_id, type: null };
+
+				const section = uci.get_all('homeproxy', section_id);
+				if (!section || section['.type'] !== 'node')
+					return { id: section_id, label: fallback_label || section_id, type: null };
+
+				const address = trim(section.address || '');
+				const port = trim(section.port || '');
+				const label = trim(section.label || '') || ((address && port) ? `${address}:${port}` : section_id);
+				return { id: section_id, label, type: section.type || null };
+			};
+
+			const main_node = trim(uci.get('homeproxy', 'config', 'main_node') || 'nil');
+			const main_udp_node = trim(uci.get('homeproxy', 'config', 'main_udp_node') || 'nil');
+
+			const main_needs_api = (main_node === 'urltest');
+			const udp_needs_api = (main_udp_node === 'urltest');
+
+			let data = null, api_error = null;
+			if (main_needs_api || udp_needs_api) {
+				const dashboard_port = int(uci.get('homeproxy', 'config', 'dashboard_port')) || 9096;
+				const clash_api_port = dashboard_port + 1;
+
+				const fd = popen(`/usr/bin/curl -fsS --connect-timeout 1 --max-time 2 http://127.0.0.1:${clash_api_port}/proxies 2>/dev/null`);
+				if (fd) {
+					let payload = '', line;
+					for (line = fd.read('line'); length(line); line = fd.read('line'))
+						payload += line;
+					fd.close();
+
+					try { data = json(payload); } catch (e) {}
+				}
+
+				if (!data)
+					api_error = 'clash_api_unavailable';
+			}
+
+			const resolveGroupTag = (group_tag) => {
+				const group = data?.proxies?.[group_tag];
+				const tag = trim(group?.now || '');
+				if (!tag)
+					return { active: { id: 'urltest', label: 'URLTest', type: 'urltest' }, error: 'missing_current_proxy' };
+
+				let found = null;
+				uci.foreach('homeproxy', 'node', (section) => {
+					if (found) return;
+					if (trim(section.label || '') === tag)
+						found = section;
+				});
+
+				if (found)
+					return { active: { id: found['.name'], label: tag, type: found.type || null }, error: null };
+
+				const matched = match(tag, /^cfg-(.*)-out$/);
+				const section_id = matched ? matched[1] : tag;
+
+				return { active: formatNode(section_id, tag), error: null };
+			};
+
+			let active, error;
+			if (!main_needs_api) {
+				active = formatNode(main_node, (main_node === 'nil') ? 'Disable' : null);
+				error = null;
+			} else if (api_error) {
+				active = { id: 'urltest', label: 'URLTest', type: 'urltest' };
+				error = api_error;
+			} else {
+				const r = resolveGroupTag('main-out');
+				active = r.active;
+				error = r.error;
+			}
+
+			let udp_active = null, udp_error = null;
+			if (udp_needs_api) {
+				if (api_error) {
+					udp_active = { id: 'urltest', label: 'URLTest', type: 'urltest' };
+					udp_error = api_error;
+				} else {
+					const r = resolveGroupTag('main-udp-out');
+					udp_active = r.active;
+					udp_error = r.error;
+				}
+			}
+
+			return {
+				mode: main_node,
+				active,
+				error,
+				udp_mode: main_udp_node,
+				udp_active,
+				udp_error
+			};
 		}
 	},
 

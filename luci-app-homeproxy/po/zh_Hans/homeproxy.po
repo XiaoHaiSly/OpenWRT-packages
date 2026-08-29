@@ -1352,9 +1352,9 @@ msgstr "监听端口"
 msgid "Loading"
 msgstr "加载中"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1335
-msgid "Local"
-msgstr "本地"
+#: htdocs/luci-static/resources/view/homeproxy/node.js:1592
+msgid "Default"
+msgstr "默认"
 
 #: htdocs/luci-static/resources/view/homeproxy/node.js:896
 msgid "Local address"
@@ -2024,7 +2024,7 @@ msgstr "区域 ID"
 msgid "Reject"
 msgstr "拒绝"
 
-#: htdocs/luci-static/resources/view/homeproxy/client.js:1336
+#: htdocs/luci-static/resources/view/homeproxy/node.js:1593
 msgid "Remote"
 msgstr "远程"
 
@@ -3259,7 +3259,7 @@ msgstr "自动更新"
 msgid "Update Interval (minutes)"
 msgstr "更新间隔（分钟）"
 
-#: htdocs/luci-static/resources/view/homeproxy/node.js:1543
+#: htdocs/luci-static/resources/view/homeproxy/node.js:1588
 msgid "Prefer"
 msgstr "优先"
 
