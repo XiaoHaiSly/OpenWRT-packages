@@ -1246,7 +1246,7 @@ msgstr "接口控制"
 #: htdocs/luci-static/resources/view/homeproxy/client.js:361
 #: htdocs/luci-static/resources/view/homeproxy/client.js:427
 msgid "Interrupt existing connections"
-msgstr "自动切换时断开旧连接"
+msgstr "切换时断开旧连接"
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:561
 msgid "Interrupt existing connections when the selected outbound has changed."
@@ -3354,7 +3354,7 @@ msgstr "恢复失败"
 
 #: htdocs/luci-static/resources/view/homeproxy/status.js
 msgid "Checking requirements..."
-msgstr "正在探测构架..."
+msgstr "正在检测构架..."
 
 
 #: htdocs/luci-static/resources/view/homeproxy/status.js
