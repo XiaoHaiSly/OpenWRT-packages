@@ -229,10 +229,10 @@ check_dashboard_update() {
 
 case "$1" in
 "china_ip4")
-	check_list_update "$1" "1715173329/IPCIDR-CHINA" "master" "ipv4.txt"
+	check_list_update "$1" "gaoyifan/china-operator-ip" "ip-lists" "china.txt"
 	;;
 "china_ip6")
-	check_list_update "$1" "1715173329/IPCIDR-CHINA" "master" "ipv6.txt"
+	check_list_update "$1" "gaoyifan/china-operator-ip" "ip-lists" "china6.txt"
 	;;
 "gfw_list")
 	check_list_update "$1" "Loyalsoldier/v2ray-rules-dat" "release" "gfw.txt"
