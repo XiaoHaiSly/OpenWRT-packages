@@ -498,7 +498,6 @@ return view.extend({
 			_('Specify target ports to be proxied. Multiple ports must be separated by commas.'));
 		o.value('', _('All ports'));
 		o.value('common', _('Common ports only (bypass P2P traffic)'));
-		o.default = 'common';
 		o.depends({'main_node': /^((?!core_only).)+$/});
 		o.validate = function(section_id, value) {
 			if (section_id && value && value !== 'common') {
