@@ -406,7 +406,10 @@ const methods = {
 				const group = data?.proxies?.[group_tag];
 				const tag = trim(group?.now || '');
 				if (!tag)
-					return { active: { id: 'urltest', label: 'URLTest', type: 'urltest' }, error: 'missing_current_proxy' };
+					return { active: { id: 'urltest', label: 'URLTest', type: 'urltest' }, error: 'missing_current_proxy', delay: null };
+
+				const history = data?.proxies?.[tag]?.history;
+				const delay = (type(history) === 'array' && length(history)) ? history[length(history) - 1]?.delay : null;
 
 				let found = null;
 				uci.foreach('homeproxy', 'node', (section) => {
@@ -416,15 +419,15 @@ const methods = {
 				});
 
 				if (found)
-					return { active: { id: found['.name'], label: tag, type: found.type || null }, error: null };
+					return { active: { id: found['.name'], label: tag, type: found.type || null }, error: null, delay };
 
 				const matched = match(tag, /^cfg-(.*)-out$/);
 				const section_id = matched ? matched[1] : tag;
 
-				return { active: formatNode(section_id, tag), error: null };
+				return { active: formatNode(section_id, tag), error: null, delay };
 			};
 
-			let active, error;
+			let active, error, delay = null;
 			if (!main_needs_api) {
 				active = formatNode(main_node, (main_node === 'nil') ? 'Disable' : null);
 				error = null;
@@ -435,9 +438,10 @@ const methods = {
 				const r = resolveGroupTag('main-out');
 				active = r.active;
 				error = r.error;
+				delay = r.delay;
 			}
 
-			let udp_active = null, udp_error = null;
+			let udp_active = null, udp_error = null, udp_delay = null;
 			if (udp_needs_api) {
 				if (api_error) {
 					udp_active = { id: 'urltest', label: 'URLTest', type: 'urltest' };
@@ -446,6 +450,7 @@ const methods = {
 					const r = resolveGroupTag('main-udp-out');
 					udp_active = r.active;
 					udp_error = r.error;
+					udp_delay = r.delay;
 				}
 			}
 
@@ -453,9 +458,11 @@ const methods = {
 				mode: main_node,
 				active,
 				error,
+				delay,
 				udp_mode: main_udp_node,
 				udp_active,
-				udp_error
+				udp_error,
+				udp_delay
 			};
 		}
 	},

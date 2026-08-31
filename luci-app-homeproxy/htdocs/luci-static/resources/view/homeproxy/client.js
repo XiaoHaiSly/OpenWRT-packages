@@ -239,8 +239,8 @@ return view.extend({
 
 		let proxy_nodes = {};
 		uci.sections(data[0], 'node', (res) => {
-			let nodeaddr = ((res.type === 'direct') ? res.override_address : res.address) || '',
-			    nodeport = ((res.type === 'direct') ? res.override_port : res.port) || '';
+			let nodeaddr = res.address || '',
+			    nodeport = res.port || '';
 
 			proxy_nodes[res['.name']] =
 				String.format('[%s] %s', res.type, res.label || ((stubValidator.apply('ip6addr', nodeaddr) ?
@@ -256,6 +256,14 @@ return view.extend({
 			core_profiles['sub:' + profile_id] = res.label || profile_id;
 		});
 
+		function formatDelay(delay) {
+			if (delay === null || delay === undefined)
+				return '';
+			if (delay === 0)
+				return ' (%s)'.format(_('timeout'));
+			return ' (%dms)'.format(delay);
+		}
+
 		function refreshStatus() {
 			return Promise.all([
 				L.resolveDefault(getServiceStatus(), false),
@@ -270,14 +278,14 @@ return view.extend({
 					let active = current.active || {};
 					let nodeName = (active?.id && active.id !== 'urltest') ?
 						(proxy_nodes[active.id] || active.label || active.id) : _('Invalid node');
-					currentNodeLabel = _('URLTest: %s').format(nodeName);
+					currentNodeLabel = _('URLTest: %s').format(nodeName) + formatDelay(current.delay);
 				}
 
 				if (current?.udp_mode === 'urltest') {
 					let udpActive = current.udp_active || {};
 					let udpNodeName = (udpActive?.id && udpActive.id !== 'urltest') ?
 						(proxy_nodes[udpActive.id] || udpActive.label || udpActive.id) : _('Invalid node');
-					currentUdpNodeLabel = _('UDP URLTest: %s').format(udpNodeName);
+					currentUdpNodeLabel = _('UDP URLTest: %s').format(udpNodeName) + formatDelay(current.udp_delay);
 				}
 
 				let view = document.getElementById('service_status');

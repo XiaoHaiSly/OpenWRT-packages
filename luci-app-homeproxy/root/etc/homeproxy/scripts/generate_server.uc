@@ -29,10 +29,41 @@ config.log = {
 };
 
 config.inbounds = [];
+config.certificate_providers = [];
 
 uci.foreach(uciconfig, uciserver, (cfg) => {
 	if (cfg.enabled !== '1')
 		return;
+
+	/* sing-box >= 1.14.0: inline tls.acme is deprecated in favor of a
+	   top-level certificate provider referenced by tag; inline acme is
+	   removed entirely in 1.16.0. */
+	let acme_tag = (cfg.tls === '1' && cfg.tls_acme === '1') ? 'cfg-' + cfg['.name'] + '-acme' : null;
+	if (acme_tag)
+		push(config.certificate_providers, {
+			type: 'acme',
+			tag: acme_tag,
+			domain: cfg.tls_acme_domain,
+			data_directory: HP_DIR + '/certs',
+			default_server_name: cfg.tls_acme_dsn,
+			email: cfg.tls_acme_email,
+			provider: cfg.tls_acme_provider,
+			disable_http_challenge: strToBool(cfg.tls_acme_dhc),
+			disable_tls_alpn_challenge: strToBool(cfg.tls_acme_dtac),
+			alternative_http_port: strToInt(cfg.tls_acme_ahp),
+			alternative_tls_port: strToInt(cfg.tls_acme_atp),
+			external_account: (cfg.tls_acme_external_account === '1') ? {
+				key_id: cfg.tls_acme_ea_keyid,
+				mac_key: cfg.tls_acme_ea_mackey
+			} : null,
+			dns01_challenge: (cfg.tls_dns01_challenge === '1') ? {
+				provider: cfg.tls_dns01_provider,
+				access_key_id: cfg.tls_dns01_ali_akid,
+				access_key_secret: cfg.tls_dns01_ali_aksec,
+				region_id: cfg.tls_dns01_ali_rid,
+				api_token: cfg.tls_dns01_cf_api_token
+			} : null
+		});
 
 	push(config.inbounds, {
 		type: cfg.type,
@@ -56,10 +87,10 @@ uci.foreach(uciconfig, uciserver, (cfg) => {
 			type: cfg.hysteria_obfs_type,
 			password: cfg.hysteria_obfs_password
 		} : cfg.hysteria_obfs_password,
-		recv_window_conn: strToInt(cfg.hysteria_recv_window_conn),
-		recv_window_client: strToInt(cfg.hysteria_recv_window_client),
-		max_conn_client: strToInt(cfg.hysteria_max_conn_client),
-		disable_mtu_discovery: strToBool(cfg.hysteria_disable_mtu_discovery),
+		stream_receive_window: strToInt(cfg.hysteria_recv_window_conn),
+		connection_receive_window: strToInt(cfg.hysteria_recv_window_client),
+		max_concurrent_streams: strToInt(cfg.hysteria_max_conn_client),
+		disable_path_mtu_discovery: strToBool(cfg.hysteria_disable_mtu_discovery),
 		ignore_client_bandwidth: strToBool(cfg.hysteria_ignore_client_bandwidth),
 		masquerade: cfg.hysteria_masquerade,
 
@@ -106,28 +137,7 @@ uci.foreach(uciconfig, uciserver, (cfg) => {
 			cipher_suites: cfg.tls_cipher_suites,
 			certificate_path: cfg.tls_cert_path,
 			key_path: cfg.tls_key_path,
-			acme: (cfg.tls_acme === '1') ? {
-				domain: cfg.tls_acme_domain,
-				data_directory: HP_DIR + '/certs',
-				default_server_name: cfg.tls_acme_dsn,
-				email: cfg.tls_acme_email,
-				provider: cfg.tls_acme_provider,
-				disable_http_challenge: strToBool(cfg.tls_acme_dhc),
-				disable_tls_alpn_challenge: strToBool(cfg.tls_acme_dtac),
-				alternative_http_port: strToInt(cfg.tls_acme_ahp),
-				alternative_tls_port: strToInt(cfg.tls_acme_atp),
-				external_account: (cfg.tls_acme_external_account === '1') ? {
-					key_id: cfg.tls_acme_ea_keyid,
-					mac_key: cfg.tls_acme_ea_mackey
-				} : null,
-				dns01_challenge: (cfg.tls_dns01_challenge === '1') ? {
-					provider: cfg.tls_dns01_provider,
-					access_key_id: cfg.tls_dns01_ali_akid,
-					access_key_secret: cfg.tls_dns01_ali_aksec,
-					region_id: cfg.tls_dns01_ali_rid,
-					api_token: cfg.tls_dns01_cf_api_token
-				} : null
-			} : null,
+			certificate_provider: acme_tag,
 			ech: (cfg.tls_ech_key) ? {
 				enabled: true,
 				key: split(cfg.tls_ech_key, '\n'),
@@ -163,6 +173,9 @@ uci.foreach(uciconfig, uciserver, (cfg) => {
 
 if (length(config.inbounds) === 0)
 	exit(1);
+
+if (length(config.certificate_providers) === 0)
+	config.certificate_providers = null;
 
 system('mkdir -p ' + RUN_DIR);
 writefile(RUN_DIR + '/sing-box-s.json', sprintf('%.J\n', removeBlankAttrs(config)));

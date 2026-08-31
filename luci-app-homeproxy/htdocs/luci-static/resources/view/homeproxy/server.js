@@ -288,14 +288,14 @@ return view.extend({
 		o = s.option(form.Value, 'hysteria_recv_window_conn', _('QUIC stream receive window'),
 			_('The QUIC stream-level flow control window for receiving data.'));
 		o.datatype = 'uinteger';
-		o.default = '67108864';
+		o.default = '15728640';
 		o.depends('type', 'hysteria');
 		o.modalonly = true;
 
 		o = s.option(form.Value, 'hysteria_recv_window_client', _('QUIC connection receive window'),
 			_('The QUIC connection-level flow control window for receiving data.'));
 		o.datatype = 'uinteger';
-		o.default = '15728640';
+		o.default = '67108864';
 		o.depends('type', 'hysteria');
 		o.modalonly = true;
 
