@@ -1387,9 +1387,7 @@ return view.extend({
 		o.placeholder = 'v2rayNG/2.3.2';
 
 		o = s.taboption('subscription', form.Flag, 'allow_insecure', _('Allow insecure'),
-			_('Allow insecure connection by default when add nodes from subscriptions.') +
-			'<br/>' +
-			_('This is <strong>DANGEROUS</strong>, your traffic is almost like <strong>PLAIN TEXT</strong>! Use at your own risk!'));
+			_('Allow insecure connection by default when add nodes from subscriptions.'));
 		o.rmempty = false;
 		o.onchange = allowInsecureConfirm;
 
