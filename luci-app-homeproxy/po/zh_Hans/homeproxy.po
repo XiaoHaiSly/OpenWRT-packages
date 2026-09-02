@@ -121,7 +121,7 @@ msgstr "阿里云公共 DNS（223.5.5.5）"
 
 #: htdocs/luci-static/resources/view/homeproxy/client.js:266
 msgid "All ports"
-msgstr "所有端口"
+msgstr "全部端口"
 
 #: htdocs/luci-static/resources/view/homeproxy/server.js:172
 msgid "Allow access from the Internet."
