@@ -63,7 +63,7 @@ config homeproxy 'subscription'
 	option filter_nodes 'blacklist'
 	list filter_keywords '重置|到期|过期|剩余|套餐'
 	list filter_keywords 'Expiration|Remaining'
-	option user_agent 'HomeProxy'
+	option user_agent 'HomeProxy/Meta'
 
 config homeproxy 'server'
 	option enabled '0'
