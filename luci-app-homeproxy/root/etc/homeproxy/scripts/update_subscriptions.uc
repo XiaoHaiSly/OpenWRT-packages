@@ -1032,7 +1032,7 @@ function main() {
 			try {
 				nodes = json(res).servers || json(res);
 
-				if (nodes[0].server && nodes[0].method)
+				if (type(nodes) === 'array' && length(nodes) && type(nodes[0]) === 'object' && nodes[0].server && nodes[0].method)
 					map(nodes, (_, i) => nodes[i].nodetype = 'sip008');
 			} catch(e) {
 				nodes = decodeBase64Str(res);
@@ -1106,11 +1106,19 @@ function main() {
 
 			log(sprintf('Removing node: %s.', cfg.label || cfg['name']));
 		} else {
+			const fresh = node_cache[cfg.grouphash][cfg['.name']];
 			map(keys(cfg), (v) => {
-				if (v in node_cache[cfg.grouphash][cfg['.name']])
-					uci.set(uciconfig, cfg['.name'], v, node_cache[cfg.grouphash][cfg['.name']][v]);
+				if (substr(v, 0, 1) === '.')
+					return;
+
+				if (v in fresh)
+					uci.set(uciconfig, cfg['.name'], v, fresh[v]);
 				else
 					uci.delete(uciconfig, cfg['.name'], v);
+			});
+			map(keys(fresh), (v) => {
+				if (v !== 'confhash' && !(v in cfg))
+					uci.set(uciconfig, cfg['.name'], v, fresh[v]);
 			});
 			node_cache[cfg.grouphash][cfg['.name']].isExisting = true;
 		}

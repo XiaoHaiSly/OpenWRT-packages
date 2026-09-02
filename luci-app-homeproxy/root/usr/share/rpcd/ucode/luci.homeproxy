@@ -4,6 +4,7 @@
 
 import { access, error, lstat, popen, readfile, writefile } from 'fs';
 import { cursor } from 'uci';
+import { isBinary } from '/etc/homeproxy/scripts/homeproxy.uc';
 
 function shellquote(s) {
 	return `'${replace(s, "'", "'\\''")}'`;
@@ -198,7 +199,7 @@ const methods = {
 				}
 
 				let filecontent = readfile(tmpcert);
-				if (is_binary(filecontent)) {
+				if (isBinary(filecontent)) {
 					system(`rm -f ${tmpcert}`);
 					return { result: false, error: 'illegal file type: binary' };
 				}

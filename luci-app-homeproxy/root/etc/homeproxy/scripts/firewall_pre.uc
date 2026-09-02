@@ -41,8 +41,6 @@ if (server_enabled === '1') {
 	});
 }
 
-if (!isEmpty(forward))
-	writefile(RUN_DIR + '/fw4_forward.nft', join('\n', forward) + '\n');
+writefile(RUN_DIR + '/fw4_forward.nft', isEmpty(forward) ? '' : (join('\n', forward) + '\n'));
 
-if (!isEmpty(input))
-	writefile(RUN_DIR + '/fw4_input.nft', join('\n', input) + '\n');
+writefile(RUN_DIR + '/fw4_input.nft', isEmpty(input) ? '' : (join('\n', input) + '\n'));
