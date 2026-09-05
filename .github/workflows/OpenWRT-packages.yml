@@ -26,7 +26,6 @@ jobs:
     env:
       PACKAGES: >-
         luci-app-lucky
-        luci-app-homeproxy
         luci-app-substore
         luci-app-wolultra
         luci-app-adguardhome
